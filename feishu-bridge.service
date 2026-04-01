@@ -1,0 +1,17 @@
+[Unit]
+Description=Feishu Bridge - Claude Code bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mi/feishu-bridge
+ExecStart=/usr/bin/python3 /home/mi/feishu-bridge/main.py
+EnvironmentFile=/home/mi/feishu-bridge/.env
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
