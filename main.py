@@ -5,7 +5,7 @@ Starts the Feishu WebSocket long connection bot. On startup:
 2. Configures structured logging
 3. Builds Feishu API client
 4. Fetches bot's own open_id (needed for @mention detection, Pitfall 5)
-5. Creates dedup cache
+5. Creates dedup cache and SessionManager with ClaudeAgentOptions
 6. Wires event handler pipeline
 7. Starts WebSocket client (blocks until process exit)
 """
@@ -18,10 +18,12 @@ import sys
 # We must get the loop AFTER this import to ensure we reference the same loop.
 import lark_oapi as lark
 import lark_oapi.ws  # noqa: F401 — triggers loop capture at import time
+from claude_agent_sdk import ClaudeAgentOptions
 
 from src.config import Config
 from src.dedup import DeduplicationCache
 from src.handler import create_handler
+from src.session import SessionManager
 
 import structlog
 
@@ -97,11 +99,29 @@ def main() -> None:
     # 5. Create dedup cache (CONN-02)
     dedup_cache = DeduplicationCache(max_size=1000, ttl_seconds=60)
 
+    # 5b. Create Claude options and session manager (Phase 2)
+    claude_options = ClaudeAgentOptions(
+        permission_mode="acceptEdits",   # non-interactive, auto-approve edits
+        cwd=config.working_dir,          # from WORKING_DIR env var
+    )
+    # Add allowed_tools only if configured (empty list = all tools allowed)
+    if config.allowed_tools:
+        claude_options.allowed_tools = config.allowed_tools
+
+    semaphore = asyncio.Semaphore(config.max_concurrent_tasks)  # D-11, CONC-02
+    session_manager = SessionManager(options=claude_options, semaphore=semaphore)
+    logger.info(
+        "session_manager_initialized",
+        max_concurrent=config.max_concurrent_tasks,
+        timeout=config.claude_timeout,
+        working_dir=config.working_dir,
+    )
+
     # 6. Get the event loop (AFTER lark_oapi.ws import at top of module — Pitfall 2)
     loop = asyncio.get_event_loop()
 
     # 7. Create sync handler via closure
-    on_message = create_handler(loop, api_client, bot_open_id, dedup_cache)
+    on_message = create_handler(loop, api_client, bot_open_id, dedup_cache, session_manager, config)
 
     # 8. Build event dispatcher
     # Empty strings for encrypt_key/verification_token — WS handles auth at transport layer
