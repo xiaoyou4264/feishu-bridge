@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-04-01T12:49:09.184Z"
-last_activity: 2026-04-01 -- Phase 01 execution started
+stopped_at: Completed 01-feishu-connectivity/01-02-PLAN.md
+last_updated: "2026-04-01T13:05:42.596Z"
+last_activity: 2026-04-01
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 01 (feishu-connectivity) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 01
-Last activity: 2026-04-01 -- Phase 01 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-01
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-feishu-connectivity P02 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Recent decisions affecting current work:
 - [Pre-Phase 1]: Use `lark-oapi==1.5.3` (not 1.4.6) — auto-reconnect support requires this version
 - [Pre-Phase 1]: Use `claude-agent-sdk>=0.1.53` (not deprecated `claude-code-sdk`) — v0.1.53 fixes deadlock #780 and CLOSE_WAIT leak #665
 - [Pre-Phase 1]: CardKit PATCH batched at 300-500ms intervals — per-token PATCHing hits rate limits
+- [Phase 01-feishu-connectivity]: lark-oapi 1.5.3 has no bot.v3 module; use raw BaseRequest to GET /open-apis/bot/v3/info for bot open_id
+- [Phase 01-feishu-connectivity]: Sync handler on_message_receive() wraps loop.create_task(handle_message()) — Pitfall 1 (async handler = silent drop) explicitly avoided
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T12:16:59.771Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-feishu-connectivity/01-CONTEXT.md
+Last session: 2026-04-01T13:05:42.593Z
+Stopped at: Completed 01-feishu-connectivity/01-02-PLAN.md
+Resume file: None

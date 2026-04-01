@@ -29,11 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. In a group chat the bot responds only when @mentioned, never to other messages
   4. The bot reconnects automatically after a simulated network drop without manual restart
   5. All configuration (APP_ID, APP_SECRET, log level) is read from environment variables at startup; the process refuses to start if required vars are absent
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 01-01-PLAN.md — Project scaffolding, config validation, dedup cache, message filters
-- [ ] 01-02-PLAN.md — Card reply functions, event handler pipeline, main entry point
+- [x] 01-02-PLAN.md — Card reply functions, event handler pipeline, main entry point
 - [ ] 01-03-PLAN.md — End-to-end verification with real Feishu app (checkpoint)
 
 ### Phase 2: Claude Integration
@@ -84,7 +84,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Feishu Connectivity | 1/3 | In Progress|  |
+| 1. Feishu Connectivity | 2/3 | In Progress|  |
 | 2. Claude Integration | 0/TBD | Not started | - |
 | 3. Streaming Card Renderer | 0/TBD | Not started | - |
 | 4. Stability and Operations | 0/TBD | Not started | - |
