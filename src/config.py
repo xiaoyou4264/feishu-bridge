@@ -13,6 +13,9 @@ class Config(pydantic.BaseModel):
     app_secret: str
     log_level: str = "INFO"
     working_dir: str = "."
+    claude_timeout: float = 120.0
+    max_concurrent_tasks: int = 5
+    allowed_tools: list[str] = []
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -24,6 +27,9 @@ class Config(pydantic.BaseModel):
           - APP_SECRET (required)
           - LOG_LEVEL (optional, default "INFO")
           - WORKING_DIR (optional, default ".")
+          - CLAUDE_TIMEOUT (optional, default 120.0)
+          - MAX_CONCURRENT_TASKS (optional, default 5)
+          - ALLOWED_TOOLS (optional, default [] — comma-separated list)
 
         Raises SystemExit(1) if any required variable is missing.
         """
@@ -35,12 +41,19 @@ class Config(pydantic.BaseModel):
             print(f"FATAL: Missing required environment variable: {exc}", file=sys.stderr)
             sys.exit(1)
 
+        # Parse ALLOWED_TOOLS: split by comma and filter empty strings
+        allowed_tools_raw = os.environ.get("ALLOWED_TOOLS", "")
+        allowed_tools = [t for t in allowed_tools_raw.split(",") if t] if allowed_tools_raw else []
+
         try:
             return cls(
                 app_id=app_id,
                 app_secret=app_secret,
                 log_level=os.environ.get("LOG_LEVEL", "INFO"),
                 working_dir=os.environ.get("WORKING_DIR", "."),
+                claude_timeout=float(os.environ.get("CLAUDE_TIMEOUT", "120")),
+                max_concurrent_tasks=int(os.environ.get("MAX_CONCURRENT_TASKS", "5")),
+                allowed_tools=allowed_tools,
             )
         except pydantic.ValidationError as exc:
             print(f"FATAL: Configuration validation error: {exc}", file=sys.stderr)
