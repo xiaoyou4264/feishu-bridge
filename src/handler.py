@@ -62,29 +62,65 @@ def create_handler(
 
 def create_card_action_handler():
     """
-    Factory: returns a SYNC handler for card action callbacks (INTER-03).
+    Factory: returns a SYNC handler for card action callbacks (INTER-01, INTER-02).
 
     Per D-28: registers card.action.trigger callback via long connection.
-    Per D-29: Phase 3 only builds infrastructure — no button logic yet.
     Per Pitfall 6: handler MUST be sync (not async). The lark SDK calls it synchronously.
+    Per INTER-01: Stop button cancels the running Claude task.
+    Per INTER-02: Feedback buttons log structlog event.
 
     Returns:
         A sync callable compatible with register_p2_card_action_trigger().
     """
 
     def on_card_action(data) -> "P2CardActionTriggerResponse":
-        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+        from lark_oapi.event.callback.model.p2_card_action_trigger import (
+            P2CardActionTriggerResponse, CallBackToast,
+        )
+        from src.claude_worker import cancel_task_for_message
 
-        # Phase 3: log and return empty response (D-29)
-        action_tag = None
-        operator_id = None
+        resp = P2CardActionTriggerResponse()
+
+        # Extract action value from callback data
+        action_value = {}
         try:
-            action_tag = getattr(data.action, "tag", None) if hasattr(data, "action") else None
-            operator_id = getattr(data.operator, "open_id", None) if hasattr(data, "operator") else None
+            action_value = data.event.action.value or {}
         except Exception:
             pass
-        logger.info("card_action_received", action_tag=action_tag, operator_id=operator_id)
-        return P2CardActionTriggerResponse()
+
+        action_type = action_value.get("action")
+        message_id = action_value.get("message_id")
+
+        if action_type == "stop" and message_id:
+            cancelled = cancel_task_for_message(message_id)
+            toast = CallBackToast()
+            toast.type = "info"
+            toast.content = "已停止" if cancelled else "任务已完成"
+            resp.toast = toast
+            logger.info("stop_button_clicked", message_id=message_id, cancelled=cancelled)
+
+        elif action_type in ("thumbs_up", "thumbs_down") and message_id:
+            operator_id = None
+            try:
+                operator_id = data.event.operator.open_id
+            except Exception:
+                pass
+            logger.info(
+                "feedback_received",
+                feedback=action_type,
+                message_id=message_id,
+                operator_id=operator_id,
+            )
+            toast = CallBackToast()
+            toast.type = "success"
+            toast.content = "感谢反馈！"
+            resp.toast = toast
+
+        else:
+            # Unknown action — log for debugging
+            logger.debug("unknown_card_action", action_value=action_value)
+
+        return resp
 
     return on_card_action
 

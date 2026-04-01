@@ -648,8 +648,8 @@ class TestCardActionHandler:
 
         assert isinstance(result, P2CardActionTriggerResponse)
 
-    def test_on_card_action_logs_card_action_received(self):
-        """on_card_action handler logs 'card_action_received' event."""
+    def test_on_card_action_logs_unknown_card_action(self):
+        """on_card_action handler logs 'unknown_card_action' event for unrecognized actions."""
         from src.handler import create_card_action_handler
 
         handler = create_card_action_handler()
@@ -662,10 +662,10 @@ class TestCardActionHandler:
         with patch("src.handler.logger") as mock_logger:
             handler(data)
 
-        # Verify logger.info was called with "card_action_received"
-        mock_logger.info.assert_called()
-        call_args = mock_logger.info.call_args
-        assert call_args[0][0] == "card_action_received"
+        # Verify logger.debug was called with "unknown_card_action" (new handler behavior)
+        mock_logger.debug.assert_called()
+        call_args = mock_logger.debug.call_args
+        assert call_args[0][0] == "unknown_card_action"
 
     def test_on_card_action_handles_missing_attributes_gracefully(self):
         """on_card_action does NOT raise when data has no action or operator attribute."""
