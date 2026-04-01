@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-04-01T14:10:42.098Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-04-01T14:52:31.928Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 6
+  total_plans: 8
   completed_plans: 5
   percent: 25
 ---
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** 飞书消息到 Claude Code 的可靠桥接 — 消息进来，AI 回复出去，流式显示思考过程，不丢消息不崩溃。
-**Current focus:** Phase 02 — claude-integration
+**Current focus:** Phase 03 — streaming-card-renderer
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
-Status: Executing
+Phase: 03 (streaming-card-renderer) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-01
 
 Progress: [██░░░░░░░░] 25%
@@ -56,6 +56,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 02-claude-integration P01 | 10min | 2 tasks | 6 files |
 | Phase 02-claude-integration P02 | 4min | 2 tasks | 4 files |
 | Phase 02-claude-integration P03 | 3min | 2 tasks | 3 files |
+| Phase 03 P01 | 6 | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 02-claude-integration]: Semaphore OUTER, session.lock INNER — reverse order risks circular-wait deadlock
 - [Phase 02-claude-integration]: /new command handled before thinking card to avoid flash on session reset
 - [Phase 02-claude-integration]: asyncio.create_task fire-and-forget dispatch ensures handler returns immediately (CONC-01)
+- [Phase 03-01]: CardKit sequence API uses caller-generated sequence_id (UUID), not server-assigned
+- [Phase 03-01]: CreateCardRequestBody uses .data() method, not .card() (lark-oapi 1.5.3 API)
 
 ### Pending Todos
 
@@ -89,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T14:10:42.096Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-streaming-card-renderer/03-CONTEXT.md
+Last session: 2026-04-01T14:52:31.925Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None

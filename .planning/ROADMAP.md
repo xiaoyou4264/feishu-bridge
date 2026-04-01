@@ -67,7 +67,7 @@ Plans:
   3. The card displays a typing indicator during generation and removes it once the response is complete
   4. Sending a rapid sequence of messages does not produce HTTP 429 errors; batching absorbs the burst
   5. The final card contains the complete formatted Markdown response and no typing indicator
-**Plans:** 2 plans
+**Plans:** 0/2 plans executed
 
 Plans:
 - [ ] 03-01-PLAN.md — CardStreamingManager module + cards.py streaming card functions
@@ -95,5 +95,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Feishu Connectivity | 2/3 | In Progress|  |
 | 2. Claude Integration | 3/3 | Complete   | 2026-04-01 |
-| 3. Streaming Card Renderer | 0/2 | Planned | - |
+| 3. Streaming Card Renderer | 0/2 | Planned    |  |
 | 4. Stability and Operations | 0/TBD | Not started | - |

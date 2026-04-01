@@ -26,12 +26,12 @@
 ### Streaming Card (流式卡片)
 
 - [x] **CARD-01**: 收到消息后 3 秒内发送"思考中"初始卡片
-- [ ] **CARD-02**: 通过 CardKit PATCH API 实时流式更新卡片内容（打字机效果）
-- [ ] **CARD-03**: 批量更新策略 — 每 300-500ms 合并一次 PATCH，避免触发速率限制
-- [ ] **CARD-04**: 流式过程中显示 typing indicator，完成后移除
-- [ ] **CARD-05**: Claude 工具调用可见 — 在卡片中显示 bash/read/write 等工具使用情况
-- [ ] **CARD-06**: 文件操作结果在卡片中展示（路径和摘要）
-- [ ] **CARD-07**: 最终卡片包含完整响应，格式化为 Markdown
+- [x] **CARD-02**: 通过 CardKit PATCH API 实时流式更新卡片内容（打字机效果）
+- [x] **CARD-03**: 批量更新策略 — 每 300-500ms 合并一次 PATCH，避免触发速率限制
+- [x] **CARD-04**: 流式过程中显示 typing indicator，完成后移除
+- [x] **CARD-05**: Claude 工具调用可见 — 在卡片中显示 bash/read/write 等工具使用情况
+- [x] **CARD-06**: 文件操作结果在卡片中展示（路径和摘要）
+- [x] **CARD-07**: 最终卡片包含完整响应，格式化为 Markdown
 
 ### Session Management (会话管理)
 
@@ -102,12 +102,12 @@
 | SESS-01 | Phase 2 | Complete |
 | SESS-02 | Phase 2 | Complete |
 | SESS-03 | Phase 2 | Complete |
-| CARD-02 | Phase 3 | Pending |
-| CARD-03 | Phase 3 | Pending |
-| CARD-04 | Phase 3 | Pending |
-| CARD-05 | Phase 3 | Pending |
-| CARD-06 | Phase 3 | Pending |
-| CARD-07 | Phase 3 | Pending |
+| CARD-02 | Phase 3 | Complete |
+| CARD-03 | Phase 3 | Complete |
+| CARD-04 | Phase 3 | Complete |
+| CARD-05 | Phase 3 | Complete |
+| CARD-06 | Phase 3 | Complete |
+| CARD-07 | Phase 3 | Complete |
 | INTER-03 | Phase 3 | Pending |
 | STAB-01 | Phase 4 | Pending |
 | STAB-02 | Phase 4 | Pending |
