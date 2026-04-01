@@ -2,6 +2,7 @@
 import json
 
 import lark_oapi as lark
+from lark_oapi.core.token import TokenManager
 import structlog
 
 logger = structlog.get_logger()
@@ -200,3 +201,86 @@ async def send_error_card(
             code=resp.code,
             msg=resp.msg,
         )
+
+
+async def create_streaming_card(client: lark.Client) -> str:
+    """
+    Create a CardKit streaming card via lark-oapi acreate.
+
+    Returns the card_id needed for CardStreamingManager sequence API calls.
+
+    Args:
+        client: Authenticated lark.Client instance.
+
+    Returns:
+        card_id from CardKit create response.
+
+    Raises:
+        RuntimeError: If card creation fails.
+    """
+    card_template = {
+        "schema": "2.0",
+        "header": {
+            "title": {"tag": "plain_text", "content": "AI 助手"},
+            "template": "blue",
+        },
+        "body": {
+            "elements": [
+                {"tag": "markdown", "content": "**正在思考中...**"}
+            ]
+        },
+    }
+
+    request = (
+        lark.cardkit.v1.CreateCardRequest.builder()
+        .request_body(
+            lark.cardkit.v1.CreateCardRequestBody.builder()
+            .data(json.dumps(card_template, ensure_ascii=False))
+            .build()
+        )
+        .build()
+    )
+
+    resp = await client.cardkit.v1.card.acreate(request)
+    if not resp.success():
+        raise RuntimeError(f"CardKit create failed: {resp.code} {resp.msg}")
+
+    logger.debug("streaming_card_created", card_id=resp.data.card_id)
+    return resp.data.card_id
+
+
+async def patch_im_with_card_id(
+    client: lark.Client, message_id: str, card_id: str
+) -> None:
+    """
+    Patch an IM message to embed a CardKit card_id.
+
+    This links the IM message (from send_thinking_card) with the streaming
+    CardKit card (from create_streaming_card), enabling sequence updates.
+
+    Args:
+        client: Authenticated lark.Client instance.
+        message_id: The reply_message_id from send_thinking_card().
+        card_id: The card_id from create_streaming_card().
+
+    Raises:
+        RuntimeError: If patch fails.
+    """
+    card_content = json.dumps({"card_id": card_id}, ensure_ascii=False)
+
+    request = (
+        lark.im.v1.PatchMessageRequest.builder()
+        .message_id(message_id)
+        .request_body(
+            lark.im.v1.PatchMessageRequestBody.builder()
+            .content(card_content)
+            .build()
+        )
+        .build()
+    )
+
+    resp = await client.im.v1.message.apatch(request)
+    if not resp.success():
+        raise RuntimeError(f"IM card_id patch failed: {resp.code} {resp.msg}")
+
+    logger.debug("im_card_id_patched", message_id=message_id, card_id=card_id)
