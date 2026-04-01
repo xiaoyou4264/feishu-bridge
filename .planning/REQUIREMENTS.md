@@ -20,8 +20,8 @@
 - [ ] **CLAUDE-02**: 流式获取 Claude 响应（token-by-token）
 - [ ] **CLAUDE-03**: 多轮对话 — 同一会话保持上下文连续
 - [ ] **CLAUDE-04**: 每个活跃会话一个 asyncio Task，异常隔离不影响其他会话
-- [ ] **CLAUDE-05**: 单条消息处理超时看门狗（防止僵死）
-- [ ] **CLAUDE-06**: 可选的本地文件系统/命令执行能力（通过配置开启）
+- [x] **CLAUDE-05**: 单条消息处理超时看门狗（防止僵死）
+- [x] **CLAUDE-06**: 可选的本地文件系统/命令执行能力（通过配置开启）
 
 ### Streaming Card (流式卡片)
 
@@ -44,7 +44,7 @@
 ### Concurrency (并发控制)
 
 - [ ] **CONC-01**: 消息并行处理 — 多条消息可同时被不同 asyncio Task 处理
-- [ ] **CONC-02**: 可配置最大并行数（`MAX_CONCURRENT_TASKS` 环境变量），超出时排队等待
+- [x] **CONC-02**: 可配置最大并行数（`MAX_CONCURRENT_TASKS` 环境变量），超出时排队等待
 - [ ] **CONC-03**: 群聊内多用户消息并行处理 — 每条消息独立 Task，共享群聊对话历史，回复完成后追加到历史
 
 ### Interaction (交互)
@@ -97,8 +97,8 @@
 | CLAUDE-02 | Phase 2 | Pending |
 | CLAUDE-03 | Phase 2 | Pending |
 | CLAUDE-04 | Phase 2 | Pending |
-| CLAUDE-05 | Phase 2 | Pending |
-| CLAUDE-06 | Phase 2 | Pending |
+| CLAUDE-05 | Phase 2 | Complete |
+| CLAUDE-06 | Phase 2 | Complete |
 | SESS-01 | Phase 2 | Pending |
 | SESS-02 | Phase 2 | Pending |
 | SESS-03 | Phase 2 | Pending |
@@ -118,7 +118,7 @@
 | INTER-01 | Phase 4 | Pending |
 | INTER-02 | Phase 4 | Pending |
 | CONC-01 | Phase 2 | Pending |
-| CONC-02 | Phase 2 | Pending |
+| CONC-02 | Phase 2 | Complete |
 | CONC-03 | Phase 2 | Pending |
 
 ---

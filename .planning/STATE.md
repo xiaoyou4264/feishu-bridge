@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-04-01T13:20:42.877Z"
+stopped_at: Completed 02-01-PLAN.md (Config + Card functions)
+last_updated: "2026-04-01T21:54:00Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 25
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** 飞书消息到 Claude Code 的可靠桥接 — 消息进来，AI 回复出去，流式显示思考过程，不丢消息不崩溃。
-**Current focus:** Phase 01 — feishu-connectivity
+**Current focus:** Phase 02 — claude-integration
 
 ## Current Position
 
 Phase: 2
-Plan: Not started
-Status: Ready to execute
+Plan: 01 complete, Plan 02 next
+Status: Executing
 Last activity: 2026-04-01
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-feishu-connectivity P02 | 6min | 2 tasks | 5 files |
+| Phase 02-claude-integration P01 | 10min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ Recent decisions affecting current work:
 - [Pre-Phase 1]: CardKit PATCH batched at 300-500ms intervals — per-token PATCHing hits rate limits
 - [Phase 01-feishu-connectivity]: lark-oapi 1.5.3 has no bot.v3 module; use raw BaseRequest to GET /open-apis/bot/v3/info for bot open_id
 - [Phase 01-feishu-connectivity]: Sync handler on_message_receive() wraps loop.create_task(handle_message()) — Pitfall 1 (async handler = silent drop) explicitly avoided
+- [Phase 02-01]: lark-oapi 1.5.3 has apatch on im.v1.message — use PatchMessageRequest + apatch for card updates (not BaseRequest)
+- [Phase 02-01]: CardKit v2 format {data: {schema: "2.0", header, body}} required — old flat format {header, elements} breaks tests
+- [Phase 02-01]: Mock load_dotenv in config tests — load_dotenv() re-populates env vars deleted by monkeypatch, breaks missing-var tests
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T13:20:42.874Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-claude-integration/02-CONTEXT.md
+Last session: 2026-04-01T21:54:00Z
+Stopped at: Completed 02-01-PLAN.md (Config + Card functions)
+Resume file: .planning/phases/02-claude-integration/02-02-PLAN.md
