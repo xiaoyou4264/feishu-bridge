@@ -10,6 +10,7 @@ import json
 
 import lark_oapi as lark
 import structlog
+from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from src.cards import send_thinking_card, send_unsupported_type_card
 from src.claude_worker import single_turn_worker
@@ -125,114 +126,142 @@ async def handle_message(
             logger.debug("event_deduplicated", event_id=event_id)
             return
 
-        # Step 2: Extract message
-        message = data.event.message
+        # Bind event_id to structlog context so all log lines in this pipeline include it (D-35)
+        # MUST be called BEFORE asyncio.create_task() — child task inherits context snapshot (Pitfall 3)
+        bind_contextvars(event_id=event_id)
 
-        # Step 3: Filter — group messages require @mention (CONN-03)
-        if not should_respond(message, bot_open_id):
-            logger.debug(
-                "message_filtered",
-                event_id=event_id,
-                chat_type=message.chat_type,
-            )
-            return
-
-        # Step 4: Parse message type (D-04, D-05)
         try:
-            text, msg_type = parse_message_content(message)
-        except ValueError as exc:
-            # Unsupported message type — send friendly prompt (D-05)
-            err_msg = str(exc)
-            if err_msg.startswith("unsupported_type:"):
-                unsupported_type = err_msg.split(":", 1)[1]
-                logger.info(
-                    "unsupported_message_type",
+            # Step 2: Extract message
+            message = data.event.message
+
+            # Step 3: Filter — group messages require @mention (CONN-03)
+            if not should_respond(message, bot_open_id):
+                logger.debug(
+                    "message_filtered",
                     event_id=event_id,
-                    msg_type=unsupported_type,
-                )
-                await send_unsupported_type_card(
-                    api_client, message.message_id, unsupported_type
+                    chat_type=message.chat_type,
                 )
                 return
-            # Re-raise unexpected ValueError
-            raise
 
-        # Step 5: /new command — reset session and send confirmation card (SESS-03, D-17)
-        if text.strip().lower() == "/new":
+            # Step 4: Parse message type (D-04, D-05)
+            try:
+                text, msg_type = parse_message_content(message)
+            except ValueError as exc:
+                # Unsupported message type — send friendly prompt (D-05)
+                err_msg = str(exc)
+                if err_msg.startswith("unsupported_type:"):
+                    unsupported_type = err_msg.split(":", 1)[1]
+                    logger.info(
+                        "unsupported_message_type",
+                        event_id=event_id,
+                        msg_type=unsupported_type,
+                    )
+                    await send_unsupported_type_card(
+                        api_client, message.message_id, unsupported_type
+                    )
+                    return
+                # Re-raise unexpected ValueError
+                raise
+
+            # Step 5: /help command — send green help card (SESS-04)
+            if text.strip().lower() == "/help":
+                from src.cards import build_help_card
+                request = (
+                    lark.im.v1.ReplyMessageRequest.builder()
+                    .message_id(message.message_id)
+                    .request_body(
+                        lark.im.v1.ReplyMessageRequestBody.builder()
+                        .msg_type("interactive")
+                        .content(build_help_card())
+                        .build()
+                    )
+                    .build()
+                )
+                await api_client.im.v1.message.areply(request)
+                logger.info("help_command", event_id=event_id)
+                return
+
+            # Step 6: /new command — reset session and send confirmation card (SESS-03, D-17)
+            if text.strip().lower() == "/new":
+                session_key = get_session_key(
+                    message.chat_type,
+                    data.event.sender.sender_id.open_id,
+                    getattr(message, "chat_id", ""),
+                )
+                await session_manager.destroy(session_key)
+
+                # Send green confirmation card via areply
+                card = {
+                    "schema": "2.0",
+                    "header": {
+                        "title": {"tag": "plain_text", "content": "AI 助手"},
+                        "template": "green",
+                    },
+                    "body": {
+                        "elements": [
+                            {"tag": "markdown", "content": "会话已重置，开始新对话吧！"}
+                        ]
+                    },
+                }
+                request = (
+                    lark.im.v1.ReplyMessageRequest.builder()
+                    .message_id(message.message_id)
+                    .request_body(
+                        lark.im.v1.ReplyMessageRequestBody.builder()
+                        .msg_type("interactive")
+                        .content(json.dumps({"data": card}, ensure_ascii=False))
+                        .build()
+                    )
+                    .build()
+                )
+                await api_client.im.v1.message.areply(request)
+                logger.info("session_reset", event_id=event_id, session_key=session_key)
+                return
+
+            # Step 7: Send thinking card (CARD-01)
+            reply_id = await send_thinking_card(api_client, message.message_id)
+            logger.info(
+                "thinking_card_sent",
+                event_id=event_id,
+                message_id=message.message_id,
+                reply_id=reply_id,
+                msg_type=msg_type,
+            )
+
+            # Step 8: Resolve session and format prompt
             session_key = get_session_key(
                 message.chat_type,
                 data.event.sender.sender_id.open_id,
                 getattr(message, "chat_id", ""),
             )
-            await session_manager.destroy(session_key)
+            session = await session_manager.get_or_create(session_key)
 
-            # Send green confirmation card via areply
-            card = {
-                "schema": "2.0",
-                "header": {
-                    "title": {"tag": "plain_text", "content": "AI 助手"},
-                    "template": "green",
-                },
-                "body": {
-                    "elements": [
-                        {"tag": "markdown", "content": "会话已重置，开始新对话吧！"}
-                    ]
-                },
-            }
-            request = (
-                lark.im.v1.ReplyMessageRequest.builder()
-                .message_id(message.message_id)
-                .request_body(
-                    lark.im.v1.ReplyMessageRequestBody.builder()
-                    .msg_type("interactive")
-                    .content(json.dumps({"data": card}, ensure_ascii=False))
-                    .build()
+            # Group chat: fetch display_name and format prompt with prefix (D-14)
+            if message.chat_type == "group":
+                display_name = await get_display_name(
+                    api_client, data.event.sender.sender_id.open_id, session.name_cache
                 )
-                .build()
+                prompt = format_prompt(text, "group", display_name)
+            else:
+                prompt = format_prompt(text, "p2p")
+
+            # Step 9: Create isolated Task per message (CONC-01, CLAUDE-04)
+            # bind_contextvars() was called above — child task inherits event_id context snapshot
+            asyncio.create_task(
+                single_turn_worker(
+                    session=session,
+                    prompt=prompt,
+                    reply_message_id=reply_id,
+                    api_client=api_client,
+                    semaphore=session_manager.semaphore,
+                    timeout=config.claude_timeout,
+                )
             )
-            await api_client.im.v1.message.areply(request)
-            logger.info("session_reset", event_id=event_id, session_key=session_key)
-            return
+            logger.info("claude_task_dispatched", event_id=event_id, session_key=session_key)
 
-        # Step 6: Send thinking card (CARD-01)
-        reply_id = await send_thinking_card(api_client, message.message_id)
-        logger.info(
-            "thinking_card_sent",
-            event_id=event_id,
-            message_id=message.message_id,
-            reply_id=reply_id,
-            msg_type=msg_type,
-        )
-
-        # Step 7: Resolve session and format prompt
-        session_key = get_session_key(
-            message.chat_type,
-            data.event.sender.sender_id.open_id,
-            getattr(message, "chat_id", ""),
-        )
-        session = await session_manager.get_or_create(session_key)
-
-        # Group chat: fetch display_name and format prompt with prefix (D-14)
-        if message.chat_type == "group":
-            display_name = await get_display_name(
-                api_client, data.event.sender.sender_id.open_id, session.name_cache
-            )
-            prompt = format_prompt(text, "group", display_name)
-        else:
-            prompt = format_prompt(text, "p2p")
-
-        # Step 8: Create isolated Task per message (CONC-01, CLAUDE-04)
-        asyncio.create_task(
-            single_turn_worker(
-                session=session,
-                prompt=prompt,
-                reply_message_id=reply_id,
-                api_client=api_client,
-                semaphore=session_manager.semaphore,
-                timeout=config.claude_timeout,
-            )
-        )
-        logger.info("claude_task_dispatched", event_id=event_id, session_key=session_key)
+        finally:
+            # Always clear contextvars after processing — prevents leaking event_id to next event
+            clear_contextvars()
 
     except Exception as exc:
         # Catch-all: log unexpected errors without crashing the handler
