@@ -131,6 +131,105 @@ class TestSendThinkingCard:
         assert result == "om_card_reply_abc"
 
 
+class TestUpdateCardContent:
+    """Tests for update_card_content() async function."""
+
+    @pytest.mark.asyncio
+    async def test_update_card_content_calls_patch(self):
+        """update_card_content(client, message_id, text) calls im.v1.message patch API
+        with interactive card containing the text, header 'AI 助手' blue template."""
+        from src.cards import update_card_content
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = True
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        await update_card_content(mock_client, "reply_msg_001", "response text")
+
+        mock_client.im.v1.message.apatch.assert_called_once()
+        call_args = mock_client.im.v1.message.apatch.call_args[0][0]
+        request_body = call_args.request_body
+        content = json.loads(request_body.content)
+        # Check header is blue and title is AI 助手
+        assert content["data"]["header"]["title"]["content"] == "AI 助手"
+        assert content["data"]["header"]["template"] == "blue"
+        # Check body contains the text
+        elements = content["data"]["body"]["elements"]
+        assert any("response text" in elem.get("content", "") for elem in elements)
+
+    @pytest.mark.asyncio
+    async def test_update_card_content_raises_on_failure(self):
+        """When patch response is not successful, raises RuntimeError."""
+        from src.cards import update_card_content
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = False
+        mock_resp.code = 99991663
+        mock_resp.msg = "message not found"
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        with pytest.raises(RuntimeError, match="Card patch failed"):
+            await update_card_content(mock_client, "reply_msg_001", "some text")
+
+
+class TestSendErrorCard:
+    """Tests for send_error_card() async function."""
+
+    @pytest.mark.asyncio
+    async def test_send_error_card_calls_patch(self):
+        """send_error_card(client, message_id, error_message) patches card with red header."""
+        from src.cards import send_error_card
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = True
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        await send_error_card(mock_client, "reply_msg_001", "error message")
+
+        mock_client.im.v1.message.apatch.assert_called_once()
+        call_args = mock_client.im.v1.message.apatch.call_args[0][0]
+        request_body = call_args.request_body
+        content = json.loads(request_body.content)
+        # Check header is red
+        assert content["data"]["header"]["title"]["content"] == "AI 助手"
+        assert content["data"]["header"]["template"] == "red"
+
+    @pytest.mark.asyncio
+    async def test_send_error_card_includes_error_text(self):
+        """The patched card content contains the error message string."""
+        from src.cards import send_error_card
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = True
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        await send_error_card(mock_client, "reply_msg_001", "something went wrong")
+
+        call_args = mock_client.im.v1.message.apatch.call_args[0][0]
+        request_body = call_args.request_body
+        content_str = request_body.content
+        assert "something went wrong" in content_str
+
+    @pytest.mark.asyncio
+    async def test_send_error_card_does_not_raise_on_failure(self):
+        """send_error_card() logs warning but does NOT raise on patch failure (best-effort)."""
+        from src.cards import send_error_card
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = False
+        mock_resp.code = 99991663
+        mock_resp.msg = "rate limited"
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        # Should not raise
+        await send_error_card(mock_client, "reply_msg_001", "some error")
+
+
 class TestSendUnsupportedTypeCard:
     """Tests for send_unsupported_type_card() async function."""
 
