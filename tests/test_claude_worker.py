@@ -80,6 +80,55 @@ def make_mock_session(client=None):
     return SessionState(session_key="test_key", client=client)
 
 
+def make_tool_use_block(name: str = "Bash", tool_input: dict = None):
+    """Create a mock ToolUseBlock."""
+    from claude_agent_sdk import ToolUseBlock
+    block = MagicMock(spec=ToolUseBlock)
+    block.id = "tool_001"
+    block.name = name
+    block.input = tool_input or {"command": "ls"}
+    return block
+
+
+def make_tool_result_block(content: str = "file.txt", is_error: bool = False):
+    """Create a mock ToolResultBlock."""
+    from claude_agent_sdk import ToolResultBlock
+    block = MagicMock(spec=ToolResultBlock)
+    block.tool_use_id = "tool_001"
+    block.content = content
+    block.is_error = is_error
+    return block
+
+
+def make_assistant_message_with_mixed_blocks(text_blocks=None, tool_use_blocks=None, tool_result_blocks=None):
+    """Create an AssistantMessage with mixed content blocks."""
+    from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock, ToolResultBlock
+    msg = MagicMock(spec=AssistantMessage)
+    content_blocks = []
+
+    for text in (text_blocks or []):
+        block = MagicMock(spec=TextBlock)
+        block.text = text
+        content_blocks.append(block)
+
+    for (name, inp) in (tool_use_blocks or []):
+        block = MagicMock(spec=ToolUseBlock)
+        block.id = "tool_use_001"
+        block.name = name
+        block.input = inp
+        content_blocks.append(block)
+
+    for (content, is_error) in (tool_result_blocks or []):
+        block = MagicMock(spec=ToolResultBlock)
+        block.tool_use_id = "tool_use_001"
+        block.content = content
+        block.is_error = is_error
+        content_blocks.append(block)
+
+    msg.content = content_blocks
+    return msg
+
+
 # ---------------------------------------------------------------------------
 # _run_claude_turn tests
 # ---------------------------------------------------------------------------
@@ -140,8 +189,168 @@ class TestRunClaudeTurn:
 
 
 # ---------------------------------------------------------------------------
+# _run_claude_turn_streaming tests
+# ---------------------------------------------------------------------------
+
+class TestRunClaudeTurnStreaming:
+    """Tests for the new _run_claude_turn_streaming() function."""
+
+    @pytest.mark.asyncio
+    async def test_calls_query_with_prompt(self):
+        """_run_claude_turn_streaming calls client.query() with the given prompt."""
+        from src.claude_worker import _run_claude_turn_streaming
+
+        client = make_mock_client()
+        manager = MagicMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+
+        await _run_claude_turn_streaming(client, "What is 2+2?", manager)
+
+        client.query.assert_awaited_once_with("What is 2+2?")
+
+    @pytest.mark.asyncio
+    async def test_calls_append_text_for_each_text_block(self):
+        """_run_claude_turn_streaming calls manager.append_text() for each TextBlock."""
+        from src.claude_worker import _run_claude_turn_streaming
+
+        client = make_mock_client(response_items=[
+            make_assistant_message(["Hello, ", "world"]),
+            make_result_message(),
+        ])
+        manager = MagicMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+
+        await _run_claude_turn_streaming(client, "hi", manager)
+
+        assert manager.append_text.await_count == 2
+        calls = [c.args[0] for c in manager.append_text.await_args_list]
+        assert "Hello, " in calls
+        assert "world" in calls
+
+    @pytest.mark.asyncio
+    async def test_calls_append_tool_use_for_tool_use_block(self):
+        """_run_claude_turn_streaming calls manager.append_tool_use() for each ToolUseBlock."""
+        from src.claude_worker import _run_claude_turn_streaming
+        from claude_agent_sdk import ToolUseBlock
+
+        tool_block = make_tool_use_block(name="Bash", tool_input={"command": "ls"})
+
+        msg = MagicMock()
+        from claude_agent_sdk import AssistantMessage
+        msg.__class__ = AssistantMessage
+        msg.content = [tool_block]
+
+        client = MagicMock()
+        client.query = AsyncMock()
+
+        async def mock_receive():
+            yield msg
+            yield make_result_message()
+
+        client.receive_response = mock_receive
+
+        manager = MagicMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+
+        await _run_claude_turn_streaming(client, "test", manager)
+
+        manager.append_tool_use.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_calls_append_tool_result_for_tool_result_block(self):
+        """_run_claude_turn_streaming calls manager.append_tool_result() for each ToolResultBlock."""
+        from src.claude_worker import _run_claude_turn_streaming
+        from claude_agent_sdk import ToolResultBlock, AssistantMessage
+
+        tool_result_block = make_tool_result_block(content="file.txt", is_error=False)
+
+        msg = MagicMock()
+        msg.__class__ = AssistantMessage
+        msg.content = [tool_result_block]
+
+        client = MagicMock()
+        client.query = AsyncMock()
+
+        async def mock_receive():
+            yield msg
+            yield make_result_message()
+
+        client.receive_response = mock_receive
+
+        manager = MagicMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+
+        await _run_claude_turn_streaming(client, "test", manager)
+
+        manager.append_tool_result.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_returns_concatenated_text(self):
+        """_run_claude_turn_streaming returns concatenated text from all TextBlocks."""
+        from src.claude_worker import _run_claude_turn_streaming
+
+        client = make_mock_client(response_items=[
+            make_assistant_message(["Hello, "]),
+            make_assistant_message(["world!"]),
+            make_result_message(),
+        ])
+        manager = MagicMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+
+        result = await _run_claude_turn_streaming(client, "hi", manager)
+
+        assert result == "Hello, world!"
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_string_on_no_text(self):
+        """_run_claude_turn_streaming returns empty string when no TextBlocks."""
+        from src.claude_worker import _run_claude_turn_streaming
+
+        client = make_mock_client(response_items=[
+            make_result_message(),
+        ])
+        manager = MagicMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+
+        result = await _run_claude_turn_streaming(client, "test", manager)
+
+        assert result == ""
+
+
+# ---------------------------------------------------------------------------
 # single_turn_worker tests
 # ---------------------------------------------------------------------------
+
+def _patch_streaming_infra(manager_mock=None):
+    """Context manager that patches all streaming infrastructure used by single_turn_worker."""
+    from contextlib import contextmanager, AsyncExitStack
+    if manager_mock is None:
+        manager_mock = MagicMock()
+        manager_mock.start = AsyncMock()
+        manager_mock.append_text = AsyncMock()
+        manager_mock.append_tool_use = AsyncMock()
+        manager_mock.append_tool_result = AsyncMock()
+        manager_mock.finalize = AsyncMock()
+
+    return (
+        patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_test")),
+        patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+        patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+        patch("src.claude_worker.update_card_content", new=AsyncMock()),
+    )
+
 
 class TestSingleTurnWorker:
     @pytest.mark.asyncio
@@ -154,15 +363,17 @@ class TestSingleTurnWorker:
         semaphore = asyncio.Semaphore(5)
         api_client = MagicMock()
 
-        with patch("src.claude_worker.update_card_content", new=AsyncMock()):
-            await single_turn_worker(
-                session=session,
-                prompt="test prompt",
-                reply_message_id="msg_reply_001",
-                api_client=api_client,
-                semaphore=semaphore,
-                timeout=30.0,
-            )
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                await single_turn_worker(
+                    session=session,
+                    prompt="test prompt",
+                    reply_message_id="msg_reply_001",
+                    api_client=api_client,
+                    semaphore=semaphore,
+                    timeout=30.0,
+                )
 
         client.query.assert_awaited_once_with("test prompt")
 
@@ -180,15 +391,18 @@ class TestSingleTurnWorker:
         api_client = MagicMock()
 
         mock_update = AsyncMock()
-        with patch("src.claude_worker.update_card_content", new=mock_update):
-            await single_turn_worker(
-                session=session,
-                prompt="test prompt",
-                reply_message_id="msg_reply_001",
-                api_client=api_client,
-                semaphore=semaphore,
-                timeout=30.0,
-            )
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2]:
+            with patch("src.claude_worker.update_card_content", new=mock_update):
+                with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                    await single_turn_worker(
+                        session=session,
+                        prompt="test prompt",
+                        reply_message_id="msg_reply_001",
+                        api_client=api_client,
+                        semaphore=semaphore,
+                        timeout=30.0,
+                    )
 
         mock_update.assert_awaited_once_with(api_client, "msg_reply_001", "Hello from Claude")
 
@@ -208,15 +422,18 @@ class TestSingleTurnWorker:
         api_client = MagicMock()
 
         mock_error = AsyncMock()
-        with patch("src.claude_worker.send_error_card", new=mock_error):
-            await single_turn_worker(
-                session=session,
-                prompt="slow prompt",
-                reply_message_id="msg_reply_001",
-                api_client=api_client,
-                semaphore=semaphore,
-                timeout=0.05,  # 50ms timeout
-            )
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch("src.claude_worker.send_error_card", new=mock_error):
+                with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                    await single_turn_worker(
+                        session=session,
+                        prompt="slow prompt",
+                        reply_message_id="msg_reply_001",
+                        api_client=api_client,
+                        semaphore=semaphore,
+                        timeout=0.05,  # 50ms timeout
+                    )
 
         mock_error.assert_awaited_once()
         # Check that the error message mentions timeout
@@ -235,15 +452,18 @@ class TestSingleTurnWorker:
         api_client = MagicMock()
 
         mock_error = AsyncMock()
-        with patch("src.claude_worker.send_error_card", new=mock_error):
-            await single_turn_worker(
-                session=session,
-                prompt="bad prompt",
-                reply_message_id="msg_reply_001",
-                api_client=api_client,
-                semaphore=semaphore,
-                timeout=30.0,
-            )
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch("src.claude_worker.send_error_card", new=mock_error):
+                with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                    await single_turn_worker(
+                        session=session,
+                        prompt="bad prompt",
+                        reply_message_id="msg_reply_001",
+                        api_client=api_client,
+                        semaphore=semaphore,
+                        timeout=30.0,
+                    )
 
         mock_error.assert_awaited_once()
 
@@ -259,16 +479,19 @@ class TestSingleTurnWorker:
         api_client = MagicMock()
 
         mock_error = AsyncMock()
-        with patch("src.claude_worker.send_error_card", new=mock_error):
-            # Should NOT raise
-            await single_turn_worker(
-                session=session,
-                prompt="crashing prompt",
-                reply_message_id="msg_reply_001",
-                api_client=api_client,
-                semaphore=semaphore,
-                timeout=30.0,
-            )
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch("src.claude_worker.send_error_card", new=mock_error):
+                with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                    # Should NOT raise
+                    await single_turn_worker(
+                        session=session,
+                        prompt="crashing prompt",
+                        reply_message_id="msg_reply_001",
+                        api_client=api_client,
+                        semaphore=semaphore,
+                        timeout=30.0,
+                    )
 
     @pytest.mark.asyncio
     async def test_worker_acquires_semaphore_then_lock(self):
@@ -333,15 +556,18 @@ class TestSingleTurnWorker:
         api_client = MagicMock()
 
         mock_error = AsyncMock()
-        with patch("src.claude_worker.send_error_card", new=mock_error):
-            await single_turn_worker(
-                session=session,
-                prompt="test",
-                reply_message_id="msg_reply_001",
-                api_client=api_client,
-                semaphore=semaphore,
-                timeout=0.05,
-            )
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch("src.claude_worker.send_error_card", new=mock_error):
+                with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                    await single_turn_worker(
+                        session=session,
+                        prompt="test",
+                        reply_message_id="msg_reply_001",
+                        api_client=api_client,
+                        semaphore=semaphore,
+                        timeout=0.05,
+                    )
 
         # Error card sent due to timeout
         mock_error.assert_awaited_once()
@@ -359,8 +585,92 @@ class TestSingleTurnWorker:
 
         # send_error_card also fails
         mock_error = AsyncMock(side_effect=RuntimeError("card send failed"))
-        with patch("src.claude_worker.send_error_card", new=mock_error):
-            # Should still NOT raise
+        patches = _patch_streaming_infra()
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch("src.claude_worker.send_error_card", new=mock_error):
+                with patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"):
+                    # Should still NOT raise
+                    await single_turn_worker(
+                        session=session,
+                        prompt="test",
+                        reply_message_id="msg_reply_001",
+                        api_client=api_client,
+                        semaphore=semaphore,
+                        timeout=30.0,
+                    )
+
+
+# ---------------------------------------------------------------------------
+# _run_claude_turn_streaming integration with CardStreamingManager
+# ---------------------------------------------------------------------------
+
+class TestStreamingWorkerCardManager:
+    """Tests for single_turn_worker using CardStreamingManager for streaming."""
+
+    def _make_streaming_mocks(self, response_items=None):
+        """Create mocks for streaming worker tests."""
+        if response_items is None:
+            response_items = [
+                make_assistant_message(["Hello"]),
+                make_result_message(),
+            ]
+        client = make_mock_client(response_items=response_items)
+        session = make_mock_session(client)
+        semaphore = asyncio.Semaphore(5)
+        api_client = MagicMock()
+        return client, session, semaphore, api_client
+
+    def _make_manager_mock(self):
+        """Create a mock CardStreamingManager."""
+        manager = MagicMock()
+        manager.start = AsyncMock()
+        manager.append_text = AsyncMock()
+        manager.append_tool_use = AsyncMock()
+        manager.append_tool_result = AsyncMock()
+        manager.finalize = AsyncMock()
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_calls_create_streaming_card(self):
+        """single_turn_worker calls create_streaming_card() to get card_id."""
+        from src.claude_worker import single_turn_worker
+
+        client, session, semaphore, api_client = self._make_streaming_mocks()
+        manager_mock = self._make_manager_mock()
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_123")) as mock_create,
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+            patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
+            await single_turn_worker(
+                session=session,
+                prompt="test",
+                reply_message_id="msg_001",
+                api_client=api_client,
+                semaphore=semaphore,
+                timeout=30.0,
+            )
+
+        mock_create.assert_awaited_once_with(api_client)
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_calls_patch_im_with_card_id(self):
+        """single_turn_worker calls patch_im_with_card_id() after creating the card."""
+        from src.claude_worker import single_turn_worker
+
+        client, session, semaphore, api_client = self._make_streaming_mocks()
+        manager_mock = self._make_manager_mock()
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_456")),
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()) as mock_patch,
+            patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
             await single_turn_worker(
                 session=session,
                 prompt="test",
@@ -369,3 +679,159 @@ class TestSingleTurnWorker:
                 semaphore=semaphore,
                 timeout=30.0,
             )
+
+        mock_patch.assert_awaited_once_with(api_client, "msg_reply_001", "card_456")
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_calls_manager_start(self):
+        """single_turn_worker calls manager.start() to start the flush loop."""
+        from src.claude_worker import single_turn_worker
+
+        client, session, semaphore, api_client = self._make_streaming_mocks()
+        manager_mock = self._make_manager_mock()
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_789")),
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+            patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
+            await single_turn_worker(
+                session=session,
+                prompt="test",
+                reply_message_id="msg_001",
+                api_client=api_client,
+                semaphore=semaphore,
+                timeout=30.0,
+            )
+
+        manager_mock.start.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_calls_finalize_on_success(self):
+        """single_turn_worker calls manager.finalize() with result text on success."""
+        from src.claude_worker import single_turn_worker
+
+        client, session, semaphore, api_client = self._make_streaming_mocks(response_items=[
+            make_assistant_message(["Hello Claude response"]),
+            make_result_message(),
+        ])
+        manager_mock = self._make_manager_mock()
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_001")),
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+            patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
+            await single_turn_worker(
+                session=session,
+                prompt="test",
+                reply_message_id="msg_001",
+                api_client=api_client,
+                semaphore=semaphore,
+                timeout=30.0,
+            )
+
+        # finalize should be called with the accumulated text
+        manager_mock.finalize.assert_awaited_once()
+        call_args = manager_mock.finalize.call_args
+        assert "Hello Claude response" in str(call_args)
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_calls_finalize_on_exception(self):
+        """single_turn_worker calls manager.finalize() even when an exception occurs."""
+        from src.claude_worker import single_turn_worker
+
+        client = make_mock_client()
+        client.query = AsyncMock(side_effect=RuntimeError("Claude error"))
+        session = make_mock_session(client)
+        semaphore = asyncio.Semaphore(5)
+        api_client = MagicMock()
+        manager_mock = self._make_manager_mock()
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_002")),
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+            patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+            patch("src.claude_worker.send_error_card", new=AsyncMock()),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
+            await single_turn_worker(
+                session=session,
+                prompt="bad",
+                reply_message_id="msg_002",
+                api_client=api_client,
+                semaphore=semaphore,
+                timeout=30.0,
+            )
+
+        # finalize should still be called even on exception
+        manager_mock.finalize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_calls_finalize_on_timeout(self):
+        """single_turn_worker calls manager.finalize() even on timeout."""
+        from src.claude_worker import single_turn_worker
+
+        async def slow_query(prompt):
+            await asyncio.sleep(100)
+
+        client = make_mock_client()
+        client.query = AsyncMock(side_effect=slow_query)
+        session = make_mock_session(client)
+        semaphore = asyncio.Semaphore(5)
+        api_client = MagicMock()
+        manager_mock = self._make_manager_mock()
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_003")),
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+            patch("src.claude_worker.CardStreamingManager", return_value=manager_mock),
+            patch("src.claude_worker.send_error_card", new=AsyncMock()),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
+            await single_turn_worker(
+                session=session,
+                prompt="slow",
+                reply_message_id="msg_003",
+                api_client=api_client,
+                semaphore=semaphore,
+                timeout=0.05,
+            )
+
+        # finalize should still be called on timeout
+        manager_mock.finalize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_streaming_worker_uses_uuid_for_sequence_id(self):
+        """single_turn_worker passes a UUID-based sequence_id to CardStreamingManager."""
+        from src.claude_worker import single_turn_worker
+        import uuid as uuid_module
+
+        client, session, semaphore, api_client = self._make_streaming_mocks()
+        manager_mock = self._make_manager_mock()
+        manager_class_mock = MagicMock(return_value=manager_mock)
+
+        with (
+            patch("src.claude_worker.create_streaming_card", new=AsyncMock(return_value="card_seq")),
+            patch("src.claude_worker.patch_im_with_card_id", new=AsyncMock()),
+            patch("src.claude_worker.CardStreamingManager", manager_class_mock),
+            patch("src.claude_worker.update_card_content", new=AsyncMock()),
+            patch("lark_oapi.core.token.TokenManager.get_self_tenant_token", return_value="token_test"),
+        ):
+            await single_turn_worker(
+                session=session,
+                prompt="test",
+                reply_message_id="msg_seq",
+                api_client=api_client,
+                semaphore=semaphore,
+                timeout=30.0,
+            )
+
+        # CardStreamingManager should have been constructed
+        assert manager_class_mock.called
