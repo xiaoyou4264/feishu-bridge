@@ -2,14 +2,19 @@
 
 Provides:
 - create_handler(): factory that returns a SYNC handler for lark SDK registration
-- handle_message(): async coroutine that runs the dedup/filter/card pipeline
+- handle_message(): async coroutine that runs the dedup/filter/card pipeline and
+  dispatches to Claude via SessionManager
 """
 import asyncio
+import json
 
+import lark_oapi as lark
 import structlog
 
 from src.cards import send_thinking_card, send_unsupported_type_card
+from src.claude_worker import single_turn_worker
 from src.filters import should_respond, parse_message_content
+from src.session import SessionManager, get_session_key, get_display_name, format_prompt
 
 logger = structlog.get_logger()
 
@@ -19,6 +24,8 @@ def create_handler(
     api_client,
     bot_open_id: str,
     dedup_cache,
+    session_manager: SessionManager,
+    config,
 ):
     """
     Factory: returns a SYNC event handler for lark SDK registration.
@@ -32,6 +39,8 @@ def create_handler(
         api_client: Authenticated lark.Client instance.
         bot_open_id: The bot's own open_id for @mention detection (CONN-03).
         dedup_cache: DeduplicationCache instance for event deduplication (CONN-02).
+        session_manager: SessionManager instance for Claude session lifecycle.
+        config: Config instance with claude_timeout and other settings.
 
     Returns:
         A sync callable compatible with register_p2_im_message_receive_v1().
@@ -44,12 +53,21 @@ def create_handler(
         CRITICAL: Must NOT be async. Must return immediately. All real work
         is delegated to handle_message() via loop.create_task().
         """
-        loop.create_task(handle_message(data, api_client, bot_open_id, dedup_cache))
+        loop.create_task(
+            handle_message(data, api_client, bot_open_id, dedup_cache, session_manager, config)
+        )
 
     return on_message_receive
 
 
-async def handle_message(data, api_client, bot_open_id: str, dedup_cache) -> None:
+async def handle_message(
+    data,
+    api_client,
+    bot_open_id: str,
+    dedup_cache,
+    session_manager: SessionManager,
+    config,
+) -> None:
     """
     Async event processing pipeline.
 
@@ -57,7 +75,9 @@ async def handle_message(data, api_client, bot_open_id: str, dedup_cache) -> Non
     1. Dedup check — skip if event_id already seen (CONN-02)
     2. Filter check — skip group messages without @mention (CONN-03)
     3. Parse message content — handle unsupported types (D-05)
-    4. Send thinking card (CARD-01)
+    4. /new command check — reset session and send confirmation card (SESS-03, D-17)
+    5. Send thinking card (CARD-01)
+    6. Dispatch to Claude via asyncio.Task (CONC-01, CLAUDE-04)
 
     Unexpected exceptions are caught and logged to prevent coroutine crash.
 
@@ -66,6 +86,8 @@ async def handle_message(data, api_client, bot_open_id: str, dedup_cache) -> Non
         api_client: Authenticated lark.Client instance.
         bot_open_id: Bot's own open_id for @mention detection.
         dedup_cache: DeduplicationCache instance.
+        session_manager: SessionManager for Claude session lifecycle.
+        config: Config instance (claude_timeout, etc.).
     """
     try:
         # Step 1: Dedup — use event_id (per CONN-02 and research recommendation)
@@ -106,7 +128,44 @@ async def handle_message(data, api_client, bot_open_id: str, dedup_cache) -> Non
             # Re-raise unexpected ValueError
             raise
 
-        # Step 5: Send thinking card (CARD-01)
+        # Step 5: /new command — reset session and send confirmation card (SESS-03, D-17)
+        if text.strip().lower() == "/new":
+            session_key = get_session_key(
+                message.chat_type,
+                data.event.sender.sender_id.open_id,
+                getattr(message, "chat_id", ""),
+            )
+            await session_manager.destroy(session_key)
+
+            # Send green confirmation card via areply
+            card = {
+                "schema": "2.0",
+                "header": {
+                    "title": {"tag": "plain_text", "content": "AI 助手"},
+                    "template": "green",
+                },
+                "body": {
+                    "elements": [
+                        {"tag": "markdown", "content": "会话已重置，开始新对话吧！"}
+                    ]
+                },
+            }
+            request = (
+                lark.im.v1.ReplyMessageRequest.builder()
+                .message_id(message.message_id)
+                .request_body(
+                    lark.im.v1.ReplyMessageRequestBody.builder()
+                    .msg_type("interactive")
+                    .content(json.dumps({"data": card}, ensure_ascii=False))
+                    .build()
+                )
+                .build()
+            )
+            await api_client.im.v1.message.areply(request)
+            logger.info("session_reset", event_id=event_id, session_key=session_key)
+            return
+
+        # Step 6: Send thinking card (CARD-01)
         reply_id = await send_thinking_card(api_client, message.message_id)
         logger.info(
             "thinking_card_sent",
@@ -115,6 +174,36 @@ async def handle_message(data, api_client, bot_open_id: str, dedup_cache) -> Non
             reply_id=reply_id,
             msg_type=msg_type,
         )
+
+        # Step 7: Resolve session and format prompt
+        session_key = get_session_key(
+            message.chat_type,
+            data.event.sender.sender_id.open_id,
+            getattr(message, "chat_id", ""),
+        )
+        session = await session_manager.get_or_create(session_key)
+
+        # Group chat: fetch display_name and format prompt with prefix (D-14)
+        if message.chat_type == "group":
+            display_name = await get_display_name(
+                api_client, data.event.sender.sender_id.open_id, session.name_cache
+            )
+            prompt = format_prompt(text, "group", display_name)
+        else:
+            prompt = format_prompt(text, "p2p")
+
+        # Step 8: Create isolated Task per message (CONC-01, CLAUDE-04)
+        asyncio.create_task(
+            single_turn_worker(
+                session=session,
+                prompt=prompt,
+                reply_message_id=reply_id,
+                api_client=api_client,
+                semaphore=session_manager.semaphore,
+                timeout=config.claude_timeout,
+            )
+        )
+        logger.info("claude_task_dispatched", event_id=event_id, session_key=session_key)
 
     except Exception as exc:
         # Catch-all: log unexpected errors without crashing the handler
