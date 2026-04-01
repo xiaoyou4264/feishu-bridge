@@ -39,10 +39,10 @@ created: 2026-04-01
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 01-01-01 | 01 | 1 | CONN-05 | unit | `pytest tests/test_config.py -v` | ❌ W0 | ⬜ pending |
-| 01-02-01 | 02 | 1 | CONN-01 | integration | `pytest tests/test_ws_connection.py -v` | ❌ W0 | ⬜ pending |
-| 01-02-02 | 02 | 1 | CONN-02 | unit | `pytest tests/test_dedup.py -v` | ❌ W0 | ⬜ pending |
-| 01-02-03 | 02 | 1 | CONN-03 | unit | `pytest tests/test_message_filter.py -v` | ❌ W0 | ⬜ pending |
-| 01-03-01 | 03 | 2 | CARD-01 | integration | `pytest tests/test_card_reply.py -v` | ❌ W0 | ⬜ pending |
+| 01-01-02 | 01 | 1 | CONN-02, CONN-03 | unit | `pytest tests/test_dedup.py tests/test_filters.py -v` | ❌ W0 | ⬜ pending |
+| 01-02-01 | 02 | 2 | CARD-01 | unit | `pytest tests/test_cards.py -v` | ❌ W0 | ⬜ pending |
+| 01-02-02 | 02 | 2 | CONN-01, CONN-04 | unit | `pytest tests/test_handler.py -v` | ❌ W0 | ⬜ pending |
+| 01-03-01 | 03 | 3 | ALL | manual | End-to-end with real Feishu app | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -53,7 +53,9 @@ created: 2026-04-01
 - [ ] `tests/conftest.py` — shared fixtures (mock lark client, event factory)
 - [ ] `tests/test_config.py` — config loading tests
 - [ ] `tests/test_dedup.py` — dedup logic tests
-- [ ] `tests/test_message_filter.py` — message filtering tests
+- [ ] `tests/test_filters.py` — message filtering tests
+- [ ] `tests/test_cards.py` — card reply tests
+- [ ] `tests/test_handler.py` — event handler pipeline tests
 - [ ] `pip install pytest pytest-asyncio structlog` — test framework install
 
 ---
