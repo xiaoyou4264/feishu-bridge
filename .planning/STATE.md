@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: "Completed 04-02-PLAN.md: stop button, feedback, task registry"
-last_updated: "2026-04-01T15:34:19.137Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-04-01T15:31:00.679Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
@@ -58,7 +58,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 02-claude-integration P03 | 3min | 2 tasks | 3 files |
 | Phase 03 P01 | 6 | 4 tasks | 5 files |
 | Phase 03 P02 | 8 | 2 tasks | 5 files |
-| Phase 04 P02 | 15min | 2 tasks | 5 files |
+| Phase 04-stability-and-operations P01 | 2 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -83,8 +83,8 @@ Recent decisions affecting current work:
 - [Phase 03-01]: CreateCardRequestBody uses .data() method, not .card() (lark-oapi 1.5.3 API)
 - [Phase 03]: P2CardActionTriggerResponse is correct class for card callbacks (not CardActionTriggerResponse) — at lark_oapi.event.callback.model.p2_card_action_trigger
 - [Phase 03]: CardStreamingManager.start() is async, append_* methods are async — worker awaits all manager calls
-- [Phase 04]: CancelledError handler placed before Exception clause — CancelledError is BaseException in Python 3.8+
-- [Phase 04]: cancel_task_for_message() is sync O(1) dict pop — safe within 3-second Feishu callback window
+- [Phase 04-stability-and-operations]: merge_contextvars must be first structlog processor to inject event_id into every log line
+- [Phase 04-stability-and-operations]: bind_contextvars called before asyncio.create_task so worker task inherits event_id context snapshot
 
 ### Pending Todos
 
@@ -98,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T15:34:19.134Z
-Stopped at: Completed 04-02-PLAN.md: stop button, feedback, task registry
+Last session: 2026-04-01T15:31:00.676Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None

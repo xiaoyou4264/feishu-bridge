@@ -87,8 +87,8 @@ Plans:
 **Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 04-01-PLAN.md — Structured logging + event_id correlation, /help command, session TTL cleanup
-- [x] 04-02-PLAN.md — Stop button, feedback buttons, task registry, exception hardening
+- [x] 04-01-PLAN.md — Structured logging + event_id correlation, /help command, session TTL cleanup
+- [ ] 04-02-PLAN.md — Stop button, feedback buttons, task registry, exception hardening
 - [ ] 04-03-PLAN.md — SIGTERM graceful shutdown + systemd user service deployment
 
 ## Progress

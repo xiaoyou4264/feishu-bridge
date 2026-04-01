@@ -23,9 +23,10 @@ from claude_agent_sdk import ClaudeAgentOptions
 from src.config import Config
 from src.dedup import DeduplicationCache
 from src.handler import create_handler, create_card_action_handler
-from src.session import SessionManager
+from src.session import SessionManager, session_cleanup_loop
 
 import structlog
+from structlog.contextvars import merge_contextvars
 
 
 def get_bot_open_id(client: lark.Client) -> str:
@@ -68,20 +69,39 @@ def get_bot_open_id(client: lark.Client) -> str:
     return open_id
 
 
+def configure_structlog(log_level: str, log_format: str) -> None:
+    """
+    Configure structlog with merge_contextvars and optional JSON output.
+
+    merge_contextvars MUST be first so event_id bound via bind_contextvars()
+    in handler.py is injected into every log line (D-35, D-36).
+
+    Args:
+        log_level: Logging level string (e.g. "INFO", "DEBUG").
+        log_format: "JSON" for JSONRenderer, anything else for ConsoleRenderer.
+    """
+    use_json = log_format.upper() == "JSON"
+    processors = [
+        merge_contextvars,  # MUST be first — injects event_id from contextvars
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer() if use_json else structlog.dev.ConsoleRenderer(),
+    ]
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.make_filtering_bound_logger(
+            getattr(logging, log_level.upper(), logging.INFO)
+        ),
+    )
+
+
 def main() -> None:
     """Main entry point — validates config, starts WS client."""
     # 1. Load config (CONN-05) — exits if required vars missing
     config = Config.from_env()
 
-    # 2. Configure structlog
-    structlog.configure(
-        processors=[
-            structlog.dev.ConsoleRenderer()  # Phase 4 switches to JSON
-        ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, config.log_level.upper(), logging.INFO)
-        ),
-    )
+    # 2. Configure structlog (D-35, D-36)
+    configure_structlog(config.log_level, config.log_format)
     logger = structlog.get_logger()
 
     # 3. Build lark API client
@@ -119,6 +139,12 @@ def main() -> None:
 
     # 6. Get the event loop (AFTER lark_oapi.ws import at top of module — Pitfall 2)
     loop = asyncio.get_event_loop()
+
+    # 6b. Start session TTL cleanup background task (SESS-05, D-37)
+    cleanup_task = loop.create_task(
+        session_cleanup_loop(session_manager, ttl_seconds=config.session_ttl)
+    )
+    logger.info("session_cleanup_started", session_ttl=config.session_ttl)
 
     # 7. Create sync handler via closure
     on_message = create_handler(loop, api_client, bot_open_id, dedup_cache, session_manager, config)

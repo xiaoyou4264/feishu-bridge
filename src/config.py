@@ -16,6 +16,8 @@ class Config(pydantic.BaseModel):
     claude_timeout: float = 120.0
     max_concurrent_tasks: int = 5
     allowed_tools: list[str] = []
+    session_ttl: float = 3600.0
+    log_format: str = "console"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -30,6 +32,8 @@ class Config(pydantic.BaseModel):
           - CLAUDE_TIMEOUT (optional, default 120.0)
           - MAX_CONCURRENT_TASKS (optional, default 5)
           - ALLOWED_TOOLS (optional, default [] — comma-separated list)
+          - SESSION_TTL (optional, default 3600.0 — idle session expiry in seconds)
+          - LOG_FORMAT (optional, default "console" — "console" or "JSON")
 
         Raises SystemExit(1) if any required variable is missing.
         """
@@ -54,6 +58,8 @@ class Config(pydantic.BaseModel):
                 claude_timeout=float(os.environ.get("CLAUDE_TIMEOUT", "120")),
                 max_concurrent_tasks=int(os.environ.get("MAX_CONCURRENT_TASKS", "5")),
                 allowed_tools=allowed_tools,
+                session_ttl=float(os.environ.get("SESSION_TTL", "3600")),
+                log_format=os.environ.get("LOG_FORMAT", "console"),
             )
         except pydantic.ValidationError as exc:
             print(f"FATAL: Configuration validation error: {exc}", file=sys.stderr)

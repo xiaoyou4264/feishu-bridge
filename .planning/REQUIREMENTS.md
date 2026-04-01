@@ -38,8 +38,8 @@
 - [x] **SESS-01**: P2P 会话按 `open_id` 隔离
 - [x] **SESS-02**: 群聊会话按 `chat_id` 共享上下文，但注入发送者身份（如 `[张三]: 消息内容`）以区分不同用户
 - [x] **SESS-03**: `/new` 命令重置当前会话
-- [ ] **SESS-04**: `/help` 命令显示可用命令列表
-- [ ] **SESS-05**: 空闲会话自动清理（TTL 过期释放资源）
+- [x] **SESS-04**: `/help` 命令显示可用命令列表
+- [x] **SESS-05**: 空闲会话自动清理（TTL 过期释放资源）
 
 ### Concurrency (并发控制)
 
@@ -58,7 +58,7 @@
 - [ ] **STAB-01**: 进程级异常恢复 — 单条消息错误不导致服务崩溃，回复错误卡片
 - [ ] **STAB-02**: SIGTERM 优雅退出 — 级联取消所有活跃 Task，清理子进程
 - [ ] **STAB-03**: systemd user service 部署 — 开机自启、崩溃重启
-- [ ] **STAB-04**: 结构化日志（JSON 格式，便于排查问题）
+- [x] **STAB-04**: 结构化日志（JSON 格式，便于排查问题）
 
 ## v2 Requirements
 
@@ -112,9 +112,9 @@
 | STAB-01 | Phase 4 | Pending |
 | STAB-02 | Phase 4 | Pending |
 | STAB-03 | Phase 4 | Pending |
-| STAB-04 | Phase 4 | Pending |
-| SESS-04 | Phase 4 | Pending |
-| SESS-05 | Phase 4 | Pending |
+| STAB-04 | Phase 4 | Complete |
+| SESS-04 | Phase 4 | Complete |
+| SESS-05 | Phase 4 | Complete |
 | INTER-01 | Phase 4 | Pending |
 | INTER-02 | Phase 4 | Pending |
 | CONC-01 | Phase 2 | Complete |
