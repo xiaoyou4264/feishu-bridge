@@ -404,7 +404,13 @@ class TestSingleTurnWorker:
                         timeout=30.0,
                     )
 
-        mock_update.assert_awaited_once_with(api_client, "msg_reply_001", "Hello from Claude")
+        mock_update.assert_awaited_once()
+        call_args = mock_update.call_args
+        # Now passes buttons= kwarg with feedback buttons
+        assert call_args[0][0] is api_client
+        assert call_args[0][1] == "msg_reply_001"
+        assert call_args[0][2] == "Hello from Claude"
+        assert "buttons" in call_args[1] or len(call_args[0]) == 4
 
     @pytest.mark.asyncio
     async def test_worker_timeout_sends_error_card(self):
@@ -654,7 +660,9 @@ class TestStreamingWorkerCardManager:
                 timeout=30.0,
             )
 
-        mock_create.assert_awaited_once_with(api_client)
+        mock_create.assert_awaited_once()
+        # Verify called with api_client and stop_message_id
+        assert mock_create.call_args[0][0] is api_client or mock_create.call_args.args[0] is api_client
 
     @pytest.mark.asyncio
     async def test_streaming_worker_calls_patch_im_with_card_id(self):

@@ -128,8 +128,68 @@ async def send_unsupported_type_card(
         )
 
 
+def _build_card_with_buttons(header_template: str, body_text: str, buttons: dict) -> str:
+    """Build a CardKit v2 card with markdown body and action buttons."""
+    card = {
+        "schema": "2.0",
+        "header": {
+            "title": {"tag": "plain_text", "content": "AI 助手"},
+            "template": header_template,
+        },
+        "body": {
+            "elements": [
+                {"tag": "markdown", "content": body_text},
+                buttons,
+            ]
+        },
+    }
+    return json.dumps({"data": card}, ensure_ascii=False)
+
+
+def build_stop_button(reply_message_id: str) -> dict:
+    """Build a CardKit v2 action element with a Stop button."""
+    return {
+        "tag": "action",
+        "actions": [
+            {
+                "tag": "button",
+                "text": {"tag": "plain_text", "content": "停止"},
+                "type": "danger",
+                "complex_interaction": True,
+                "width": "default",
+                "action_type": "callback",
+                "value": {"action": "stop", "message_id": reply_message_id},
+            }
+        ],
+    }
+
+
+def build_feedback_buttons(reply_message_id: str) -> dict:
+    """Build a CardKit v2 action element with thumbs up/down feedback buttons."""
+    return {
+        "tag": "action",
+        "actions": [
+            {
+                "tag": "button",
+                "text": {"tag": "plain_text", "content": "👍"},
+                "type": "default",
+                "action_type": "callback",
+                "value": {"action": "thumbs_up", "message_id": reply_message_id},
+            },
+            {
+                "tag": "button",
+                "text": {"tag": "plain_text", "content": "👎"},
+                "type": "default",
+                "action_type": "callback",
+                "value": {"action": "thumbs_down", "message_id": reply_message_id},
+            },
+        ],
+    }
+
+
+
 async def update_card_content(
-    client: lark.Client, message_id: str, text: str
+    client: lark.Client, message_id: str, text: str, buttons: dict | None = None
 ) -> None:
     """
     Patch an existing card message with new markdown text (blue header).
@@ -140,11 +200,15 @@ async def update_card_content(
         client: Authenticated lark.Client instance.
         message_id: The reply_message_id of the card to patch (returned by send_thinking_card).
         text: Markdown text to display in the card body.
+        buttons: Optional CardKit v2 action element to append to the card body.
 
     Raises:
         RuntimeError: If the patch response is not successful.
     """
-    card_content = _build_card(header_template="blue", body_text=text)
+    if buttons is not None:
+        card_content = _build_card_with_buttons(header_template="blue", body_text=text, buttons=buttons)
+    else:
+        card_content = _build_card(header_template="blue", body_text=text)
 
     request = (
         lark.im.v1.PatchMessageRequest.builder()
@@ -203,7 +267,7 @@ async def send_error_card(
         )
 
 
-async def create_streaming_card(client: lark.Client) -> str:
+async def create_streaming_card(client: lark.Client, stop_message_id: str | None = None) -> str:
     """
     Create a CardKit streaming card via lark-oapi acreate.
 
@@ -211,6 +275,7 @@ async def create_streaming_card(client: lark.Client) -> str:
 
     Args:
         client: Authenticated lark.Client instance.
+        stop_message_id: If provided, adds a Stop button to the initial card body (INTER-01).
 
     Returns:
         card_id from CardKit create response.
@@ -218,6 +283,10 @@ async def create_streaming_card(client: lark.Client) -> str:
     Raises:
         RuntimeError: If card creation fails.
     """
+    elements: list[dict] = [{"tag": "markdown", "content": "**正在思考中...**"}]
+    if stop_message_id is not None:
+        elements.append(build_stop_button(stop_message_id))
+
     card_template = {
         "schema": "2.0",
         "header": {
@@ -225,9 +294,7 @@ async def create_streaming_card(client: lark.Client) -> str:
             "template": "blue",
         },
         "body": {
-            "elements": [
-                {"tag": "markdown", "content": "**正在思考中...**"}
-            ]
+            "elements": elements
         },
     }
 
