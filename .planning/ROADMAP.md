@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Feishu Connectivity** - WebSocket long connection, event pipeline, asyncio queue bridge, dedup, @mention filter, "thinking" card
 - [x] **Phase 2: Claude Integration** - Claude Agent SDK, per-conversation asyncio Tasks, session isolation, multi-turn context, watchdog, concurrency control, group chat user attribution (completed 2026-04-01)
 - [ ] **Phase 3: Streaming Card Renderer** - CardKit POST/PATCH lifecycle, 300-500ms batched flush, tool use visibility, typing indicator
-- [ ] **Phase 4: Stability and Operations** - systemd service, graceful shutdown, structured logging, idle TTL cleanup, user commands, interaction buttons
+- [x] **Phase 4: Stability and Operations** - systemd service, graceful shutdown, structured logging, idle TTL cleanup, user commands, interaction buttons (completed 2026-04-01)
 
 ## Phase Details
 
@@ -84,12 +84,12 @@ Plans:
   3. Sending SIGTERM causes all active Claude tasks to cancel gracefully and the process exits cleanly within 10 seconds
   4. Log output is structured JSON with event_id correlation, making it possible to trace a single message end-to-end
   5. A conversation session idle for longer than the configured TTL is automatically cleaned up; `/help` lists available commands
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md — Structured logging + event_id correlation, /help command, session TTL cleanup
-- [ ] 04-02-PLAN.md — Stop button, feedback buttons, task registry, exception hardening
-- [ ] 04-03-PLAN.md — SIGTERM graceful shutdown + systemd user service deployment
+- [x] 04-02-PLAN.md — Stop button, feedback buttons, task registry, exception hardening
+- [x] 04-03-PLAN.md — SIGTERM graceful shutdown + systemd user service deployment
 
 ## Progress
 
@@ -101,4 +101,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Feishu Connectivity | 2/3 | In Progress|  |
 | 2. Claude Integration | 3/3 | Complete   | 2026-04-01 |
 | 3. Streaming Card Renderer | 0/2 | Planned    |  |
-| 4. Stability and Operations | 1/3 | In Progress|  |
+| 4. Stability and Operations | 3/3 | Complete   | 2026-04-01 |

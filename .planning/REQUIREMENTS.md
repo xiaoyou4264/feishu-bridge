@@ -56,8 +56,8 @@
 ### Stability (稳定性)
 
 - [ ] **STAB-01**: 进程级异常恢复 — 单条消息错误不导致服务崩溃，回复错误卡片
-- [ ] **STAB-02**: SIGTERM 优雅退出 — 级联取消所有活跃 Task，清理子进程
-- [ ] **STAB-03**: systemd user service 部署 — 开机自启、崩溃重启
+- [x] **STAB-02**: SIGTERM 优雅退出 — 级联取消所有活跃 Task，清理子进程
+- [x] **STAB-03**: systemd user service 部署 — 开机自启、崩溃重启
 - [x] **STAB-04**: 结构化日志（JSON 格式，便于排查问题）
 
 ## v2 Requirements
@@ -110,8 +110,8 @@
 | CARD-07 | Phase 3 | Complete |
 | INTER-03 | Phase 3 | Complete |
 | STAB-01 | Phase 4 | Pending |
-| STAB-02 | Phase 4 | Pending |
-| STAB-03 | Phase 4 | Pending |
+| STAB-02 | Phase 4 | Complete |
+| STAB-03 | Phase 4 | Complete |
 | STAB-04 | Phase 4 | Complete |
 | SESS-04 | Phase 4 | Complete |
 | SESS-05 | Phase 4 | Complete |

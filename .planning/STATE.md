@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-04-01T15:31:00.679Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-04-01T15:41:24.721Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 11
-  completed_plans: 7
+  completed_plans: 9
   percent: 25
 ---
 
@@ -59,6 +59,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 03 P01 | 6 | 4 tasks | 5 files |
 | Phase 03 P02 | 8 | 2 tasks | 5 files |
 | Phase 04-stability-and-operations P01 | 2 | 2 tasks | 5 files |
+| Phase 04-stability-and-operations P03 | 2 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 03]: CardStreamingManager.start() is async, append_* methods are async — worker awaits all manager calls
 - [Phase 04-stability-and-operations]: merge_contextvars must be first structlog processor to inject event_id into every log line
 - [Phase 04-stability-and-operations]: bind_contextvars called before asyncio.create_task so worker task inherits event_id context snapshot
+- [Phase 04-stability-and-operations]: _graceful_shutdown uses asyncio.wait(timeout=10) — handles all tasks up to timeout, workers finalize cards before exit
+- [Phase 04-stability-and-operations]: Signal handler is plain callable, not coroutine — loop.create_task() schedules async cleanup per asyncio API requirement
 
 ### Pending Todos
 
@@ -98,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T15:31:00.676Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-04-01T15:41:24.718Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
