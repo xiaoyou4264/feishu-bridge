@@ -51,7 +51,7 @@
 
 - [ ] **INTER-01**: "Stop" 按钮 — 用户可取消正在运行的 Claude 任务
 - [ ] **INTER-02**: 反馈按钮（👍/👎）— 每条回复可评价，记录到日志
-- [ ] **INTER-03**: 卡片回调处理（按钮交互通过长连接接收）
+- [x] **INTER-03**: 卡片回调处理（按钮交互通过长连接接收）
 
 ### Stability (稳定性)
 
@@ -108,7 +108,7 @@
 | CARD-05 | Phase 3 | Complete |
 | CARD-06 | Phase 3 | Complete |
 | CARD-07 | Phase 3 | Complete |
-| INTER-03 | Phase 3 | Pending |
+| INTER-03 | Phase 3 | Complete |
 | STAB-01 | Phase 4 | Pending |
 | STAB-02 | Phase 4 | Pending |
 | STAB-03 | Phase 4 | Pending |

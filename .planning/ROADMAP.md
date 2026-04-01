@@ -71,7 +71,7 @@ Plans:
 
 Plans:
 - [ ] 03-01-PLAN.md — CardStreamingManager module + cards.py streaming card functions
-- [ ] 03-02-PLAN.md — Claude worker streaming refactor + card callback infrastructure
+- [x] 03-02-PLAN.md — Claude worker streaming refactor + card callback infrastructure
 **UI hint**: yes
 
 ### Phase 4: Stability and Operations
