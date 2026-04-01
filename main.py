@@ -22,7 +22,7 @@ from claude_agent_sdk import ClaudeAgentOptions
 
 from src.config import Config
 from src.dedup import DeduplicationCache
-from src.handler import create_handler
+from src.handler import create_handler, create_card_action_handler
 from src.session import SessionManager
 
 import structlog
@@ -123,11 +123,15 @@ def main() -> None:
     # 7. Create sync handler via closure
     on_message = create_handler(loop, api_client, bot_open_id, dedup_cache, session_manager, config)
 
+    # 7b. Create card action handler (INTER-03, D-28, D-29)
+    on_card_action = create_card_action_handler()
+
     # 8. Build event dispatcher
     # Empty strings for encrypt_key/verification_token — WS handles auth at transport layer
     event_handler = (
         lark.EventDispatcherHandler.builder("", "")
         .register_p2_im_message_receive_v1(on_message)
+        .register_p2_card_action_trigger(on_card_action)  # INTER-03
         .build()
     )
 

@@ -609,3 +609,119 @@ class TestMainImportable:
             content = f.read()
         assert "def main(" in content, "main.py must have a main() function"
         assert "if __name__" in content, "main.py must have __main__ guard"
+
+
+class TestCardActionHandler:
+    """Tests for create_card_action_handler() factory and card callback infrastructure (INTER-03)."""
+
+    def test_create_card_action_handler_returns_callable(self):
+        """create_card_action_handler() returns a callable."""
+        from src.handler import create_card_action_handler
+
+        handler = create_card_action_handler()
+        assert callable(handler)
+
+    def test_on_card_action_is_sync_not_async(self):
+        """CRITICAL (Pitfall 6): The card action handler must be SYNC, not async."""
+        from src.handler import create_card_action_handler
+        import asyncio
+
+        handler = create_card_action_handler()
+        assert not asyncio.iscoroutinefunction(handler), (
+            "Card action handler must be sync (def), not async. "
+            "The lark SDK calls it synchronously (Pitfall 6)."
+        )
+
+    def test_on_card_action_returns_card_action_trigger_response(self):
+        """on_card_action handler returns a CardActionTriggerResponse instance."""
+        from src.handler import create_card_action_handler
+        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+
+        handler = create_card_action_handler()
+        data = MagicMock()
+        data.action = MagicMock()
+        data.action.tag = "button"
+        data.operator = MagicMock()
+        data.operator.open_id = "ou_user_001"
+
+        result = handler(data)
+
+        assert isinstance(result, P2CardActionTriggerResponse)
+
+    def test_on_card_action_logs_card_action_received(self):
+        """on_card_action handler logs 'card_action_received' event."""
+        from src.handler import create_card_action_handler
+
+        handler = create_card_action_handler()
+        data = MagicMock()
+        data.action = MagicMock()
+        data.action.tag = "refresh_button"
+        data.operator = MagicMock()
+        data.operator.open_id = "ou_user_log_001"
+
+        with patch("src.handler.logger") as mock_logger:
+            handler(data)
+
+        # Verify logger.info was called with "card_action_received"
+        mock_logger.info.assert_called()
+        call_args = mock_logger.info.call_args
+        assert call_args[0][0] == "card_action_received"
+
+    def test_on_card_action_handles_missing_attributes_gracefully(self):
+        """on_card_action does NOT raise when data has no action or operator attribute."""
+        from src.handler import create_card_action_handler
+
+        handler = create_card_action_handler()
+
+        # Data with no attributes at all
+        data = MagicMock(spec=[])  # empty spec = no attributes
+
+        # Should NOT raise
+        result = handler(data)
+
+        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+        assert isinstance(result, P2CardActionTriggerResponse)
+
+    def test_on_card_action_handles_none_data(self):
+        """on_card_action handles edge cases without crashing."""
+        from src.handler import create_card_action_handler
+
+        handler = create_card_action_handler()
+
+        # data with action but no tag attribute
+        data = MagicMock()
+        del data.action  # remove action attribute
+        del data.operator  # remove operator attribute
+
+        # Should NOT raise
+        result = handler(data)
+
+        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+        assert isinstance(result, P2CardActionTriggerResponse)
+
+    def test_main_registers_p2_card_action_trigger(self):
+        """main.py EventDispatcherHandler chain includes register_p2_card_action_trigger (INTER-03)."""
+        import os
+
+        assert os.path.exists("main.py"), "main.py must exist"
+
+        with open("main.py") as f:
+            content = f.read()
+
+        assert "register_p2_card_action_trigger" in content, (
+            "main.py must register card.action.trigger callback via "
+            "register_p2_card_action_trigger() (INTER-03)"
+        )
+
+    def test_main_imports_create_card_action_handler(self):
+        """main.py imports create_card_action_handler from src.handler."""
+        import os
+
+        assert os.path.exists("main.py"), "main.py must exist"
+
+        with open("main.py") as f:
+            content = f.read()
+
+        assert "create_card_action_handler" in content, (
+            "main.py must import and use create_card_action_handler from src.handler"
+        )

@@ -60,6 +60,35 @@ def create_handler(
     return on_message_receive
 
 
+def create_card_action_handler():
+    """
+    Factory: returns a SYNC handler for card action callbacks (INTER-03).
+
+    Per D-28: registers card.action.trigger callback via long connection.
+    Per D-29: Phase 3 only builds infrastructure — no button logic yet.
+    Per Pitfall 6: handler MUST be sync (not async). The lark SDK calls it synchronously.
+
+    Returns:
+        A sync callable compatible with register_p2_card_action_trigger().
+    """
+
+    def on_card_action(data) -> "P2CardActionTriggerResponse":
+        from lark_oapi.event.callback.model.p2_card_action_trigger import P2CardActionTriggerResponse
+
+        # Phase 3: log and return empty response (D-29)
+        action_tag = None
+        operator_id = None
+        try:
+            action_tag = getattr(data.action, "tag", None) if hasattr(data, "action") else None
+            operator_id = getattr(data.operator, "open_id", None) if hasattr(data, "operator") else None
+        except Exception:
+            pass
+        logger.info("card_action_received", action_tag=action_tag, operator_id=operator_id)
+        return P2CardActionTriggerResponse()
+
+    return on_card_action
+
+
 async def handle_message(
     data,
     api_client,
