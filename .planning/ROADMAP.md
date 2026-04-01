@@ -13,7 +13,7 @@ Four phases that build strictly on each other: first make the Feishu connection 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Feishu Connectivity** - WebSocket long connection, event pipeline, asyncio queue bridge, dedup, @mention filter, "thinking" card
-- [ ] **Phase 2: Claude Integration** - Claude Agent SDK, per-conversation asyncio Tasks, session isolation, multi-turn context, watchdog, concurrency control, group chat user attribution
+- [x] **Phase 2: Claude Integration** - Claude Agent SDK, per-conversation asyncio Tasks, session isolation, multi-turn context, watchdog, concurrency control, group chat user attribution (completed 2026-04-01)
 - [ ] **Phase 3: Streaming Card Renderer** - CardKit POST/PATCH lifecycle, 300-500ms batched flush, tool use visibility, typing indicator
 - [ ] **Phase 4: Stability and Operations** - systemd service, graceful shutdown, structured logging, idle TTL cleanup, user commands, interaction buttons
 
@@ -49,12 +49,12 @@ Plans:
   6. Typing `/new` in a conversation resets context so the next reply has no memory of prior turns
   7. When MAX_CONCURRENT_TASKS is reached, new messages queue instead of being dropped
   8. In a group chat, two users sending messages simultaneously both receive independent parallel responses (not queued behind each other)
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md — Config extension (timeout, concurrency, tools) + card update/error functions
 - [x] 02-02-PLAN.md — SessionManager (per-session ClaudeSDKClient) + Claude single-turn worker
-- [ ] 02-03-PLAN.md — Handler Claude dispatch, /new command, main.py SessionManager init
+- [x] 02-03-PLAN.md — Handler Claude dispatch, /new command, main.py SessionManager init
 **UI hint**: yes
 
 ### Phase 3: Streaming Card Renderer
@@ -90,6 +90,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Feishu Connectivity | 2/3 | In Progress|  |
-| 2. Claude Integration | 2/3 | In Progress|  |
+| 2. Claude Integration | 3/3 | Complete   | 2026-04-01 |
 | 3. Streaming Card Renderer | 0/TBD | Not started | - |
 | 4. Stability and Operations | 0/TBD | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md (SessionManager + Claude worker)
-last_updated: "2026-04-01T14:00:32.853Z"
+stopped_at: Completed 02-03-PLAN.md (handler Claude dispatch and main.py wiring)
+last_updated: "2026-04-01T14:07:23.445Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 25
 ---
 
@@ -55,6 +55,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 01-feishu-connectivity P02 | 6min | 2 tasks | 5 files |
 | Phase 02-claude-integration P01 | 10min | 2 tasks | 6 files |
 | Phase 02-claude-integration P02 | 4min | 2 tasks | 4 files |
+| Phase 02-claude-integration P03 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 02-01]: Mock load_dotenv in config tests — load_dotenv() re-populates env vars deleted by monkeypatch, breaks missing-var tests
 - [Phase 02-claude-integration]: Manual connect()/disconnect() on ClaudeSDKClient — session lifetime spans multiple handler calls, context manager would close after each query
 - [Phase 02-claude-integration]: Semaphore OUTER, session.lock INNER — reverse order risks circular-wait deadlock
+- [Phase 02-claude-integration]: /new command handled before thinking card to avoid flash on session reset
+- [Phase 02-claude-integration]: asyncio.create_task fire-and-forget dispatch ensures handler returns immediately (CONC-01)
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T14:00:32.850Z
-Stopped at: Completed 02-02-PLAN.md (SessionManager + Claude worker)
+Last session: 2026-04-01T14:07:23.442Z
+Stopped at: Completed 02-03-PLAN.md (handler Claude dispatch and main.py wiring)
 Resume file: None
