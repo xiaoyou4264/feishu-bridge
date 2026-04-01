@@ -36,10 +36,16 @@
 ### Session Management (会话管理)
 
 - [ ] **SESS-01**: P2P 会话按 `open_id` 隔离
-- [ ] **SESS-02**: 群聊会话按 `chat_id` 隔离（共享上下文）
+- [ ] **SESS-02**: 群聊会话按 `chat_id` 共享上下文，但注入发送者身份（如 `[张三]: 消息内容`）以区分不同用户
 - [ ] **SESS-03**: `/new` 命令重置当前会话
 - [ ] **SESS-04**: `/help` 命令显示可用命令列表
 - [ ] **SESS-05**: 空闲会话自动清理（TTL 过期释放资源）
+
+### Concurrency (并发控制)
+
+- [ ] **CONC-01**: 消息并行处理 — 多条消息可同时被不同 asyncio Task 处理
+- [ ] **CONC-02**: 可配置最大并行数（`MAX_CONCURRENT_TASKS` 环境变量），超出时排队等待
+- [ ] **CONC-03**: 群聊内多用户消息并行处理 — 每条消息独立 Task，共享群聊对话历史，回复完成后追加到历史
 
 ### Interaction (交互)
 
@@ -78,9 +84,42 @@
 
 ## Traceability
 
-| REQ-ID | Phase |
-|--------|-------|
-| (to be filled by roadmap) | |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| CONN-01 | Phase 1 | Pending |
+| CONN-02 | Phase 1 | Pending |
+| CONN-03 | Phase 1 | Pending |
+| CONN-04 | Phase 1 | Pending |
+| CONN-05 | Phase 1 | Pending |
+| CONN-06 | Phase 1 | Pending |
+| CARD-01 | Phase 1 | Pending |
+| CLAUDE-01 | Phase 2 | Pending |
+| CLAUDE-02 | Phase 2 | Pending |
+| CLAUDE-03 | Phase 2 | Pending |
+| CLAUDE-04 | Phase 2 | Pending |
+| CLAUDE-05 | Phase 2 | Pending |
+| CLAUDE-06 | Phase 2 | Pending |
+| SESS-01 | Phase 2 | Pending |
+| SESS-02 | Phase 2 | Pending |
+| SESS-03 | Phase 2 | Pending |
+| CARD-02 | Phase 3 | Pending |
+| CARD-03 | Phase 3 | Pending |
+| CARD-04 | Phase 3 | Pending |
+| CARD-05 | Phase 3 | Pending |
+| CARD-06 | Phase 3 | Pending |
+| CARD-07 | Phase 3 | Pending |
+| INTER-03 | Phase 3 | Pending |
+| STAB-01 | Phase 4 | Pending |
+| STAB-02 | Phase 4 | Pending |
+| STAB-03 | Phase 4 | Pending |
+| STAB-04 | Phase 4 | Pending |
+| SESS-04 | Phase 4 | Pending |
+| SESS-05 | Phase 4 | Pending |
+| INTER-01 | Phase 4 | Pending |
+| INTER-02 | Phase 4 | Pending |
+| CONC-01 | Phase 2 | Pending |
+| CONC-02 | Phase 2 | Pending |
+| CONC-03 | Phase 2 | Pending |
 
 ---
 *Defined: 2026-04-01*
