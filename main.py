@@ -140,6 +140,12 @@ def main() -> None:
     # 6. Get the event loop (AFTER lark_oapi.ws import at top of module — Pitfall 2)
     loop = asyncio.get_event_loop()
 
+    # 6b. Start session TTL cleanup background task (SESS-05, D-37)
+    cleanup_task = loop.create_task(
+        session_cleanup_loop(session_manager, ttl_seconds=config.session_ttl)
+    )
+    logger.info("session_cleanup_started", session_ttl=config.session_ttl)
+
     # 7. Create sync handler via closure
     on_message = create_handler(loop, api_client, bot_open_id, dedup_cache, session_manager, config)
 

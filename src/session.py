@@ -6,6 +6,7 @@ Provides:
 - get_session_key(): maps chat event to P2P (open_id) or group (chat_id) key
 - get_display_name(): fetches user display name from Feishu contact API (with cache + fallback)
 - format_prompt(): prepends [name]: prefix for group messages (D-14, D-15)
+- session_cleanup_loop(): background task to destroy idle sessions past SESSION_TTL
 """
 import asyncio
 import time
@@ -105,6 +106,39 @@ class SessionManager:
             )
 
         logger.info("session_destroyed", session_key=session_key)
+
+
+async def session_cleanup_loop(
+    session_manager: "SessionManager",
+    ttl_seconds: float,
+    interval_seconds: float = 60.0,
+) -> None:
+    """
+    Background task: scan every interval, destroy idle sessions (SESS-05, D-37, D-38).
+
+    Runs forever until cancelled (e.g., on SIGTERM). Sessions idle longer than
+    ttl_seconds since last_activity are destroyed.
+
+    Args:
+        session_manager: The SessionManager whose sessions to clean up.
+        ttl_seconds: Maximum idle time in seconds before a session is destroyed.
+        interval_seconds: How often to scan for expired sessions (default 60s).
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            now = time.time()
+            expired = [
+                key for key, state in list(session_manager._sessions.items())
+                if now - state.last_activity > ttl_seconds
+            ]
+            for key in expired:
+                await session_manager.destroy(key)
+                logger.info("session_ttl_expired", session_key=key)
+        except asyncio.CancelledError:
+            break  # Shutdown: exit cleanly
+        except Exception as exc:
+            logger.warning("session_cleanup_error", error=str(exc))
 
 
 def get_session_key(

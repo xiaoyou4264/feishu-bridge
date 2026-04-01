@@ -8,6 +8,35 @@ import structlog
 logger = structlog.get_logger()
 
 
+def build_help_card() -> str:
+    """
+    Build a green /help card listing available commands.
+
+    Returns:
+        JSON string in CardKit v2 format with green header and command list.
+    """
+    card = {
+        "schema": "2.0",
+        "header": {
+            "title": {"tag": "plain_text", "content": "AI 助手帮助"},
+            "template": "green",
+        },
+        "body": {
+            "elements": [
+                {
+                    "tag": "markdown",
+                    "content": (
+                        "**可用命令**\n\n"
+                        "- `/new` — 重置会话，开始新对话\n"
+                        "- `/help` — 显示此帮助信息\n"
+                    ),
+                }
+            ]
+        },
+    }
+    return json.dumps({"data": card}, ensure_ascii=False)
+
+
 def _build_card(header_template: str, body_text: str) -> str:
     """
     Build a CardKit v2 interactive card JSON string.
