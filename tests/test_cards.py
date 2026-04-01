@@ -4,6 +4,77 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+class TestCreateStreamingCard:
+    """Tests for create_streaming_card() async function."""
+
+    @pytest.mark.asyncio
+    async def test_creates_cardkit_card_via_acreate(self):
+        """create_streaming_card() calls cardkit.v1.card.acreate."""
+        from src.cards import create_streaming_card
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = True
+        mock_resp.data.card_id = "card_abc123"
+        mock_client.cardkit.v1.card.acreate = AsyncMock(return_value=mock_resp)
+
+        result = await create_streaming_card(mock_client)
+
+        assert result == "card_abc123"
+        mock_client.cardkit.v1.card.acreate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_raises_on_create_failure(self):
+        """create_streaming_card() raises RuntimeError if acreate fails."""
+        from src.cards import create_streaming_card
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = False
+        mock_resp.code = 400
+        mock_resp.msg = "Bad Request"
+        mock_client.cardkit.v1.card.acreate = AsyncMock(return_value=mock_resp)
+
+        with pytest.raises(RuntimeError, match="CardKit create failed"):
+            await create_streaming_card(mock_client)
+
+
+class TestPatchImWithCardId:
+    """Tests for patch_im_with_card_id() async function."""
+
+    @pytest.mark.asyncio
+    async def test_patches_im_message_with_card_id(self):
+        """patch_im_with_card_id() calls im.v1.message.apatch with card_id."""
+        from src.cards import patch_im_with_card_id
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = True
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        await patch_im_with_card_id(mock_client, "msg_123", "card_abc")
+
+        mock_client.im.v1.message.apatch.assert_called_once()
+        call_args = mock_client.im.v1.message.apatch.call_args[0][0]
+        content = json.loads(call_args.request_body.content)
+        assert content["card_id"] == "card_abc"
+
+    @pytest.mark.asyncio
+    async def test_raises_on_patch_failure(self):
+        """patch_im_with_card_id() raises RuntimeError if apatch fails."""
+        from src.cards import patch_im_with_card_id
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.success.return_value = False
+        mock_resp.code = 404
+        mock_resp.msg = "Message not found"
+        mock_client.im.v1.message.apatch = AsyncMock(return_value=mock_resp)
+
+        with pytest.raises(RuntimeError, match="IM card_id patch failed"):
+            await patch_im_with_card_id(mock_client, "msg_123", "card_abc")
+
+
 class TestSendThinkingCard:
     """Tests for send_thinking_card() async function."""
 
