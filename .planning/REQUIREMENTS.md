@@ -16,10 +16,10 @@
 
 ### Claude Integration (AI 接入)
 
-- [ ] **CLAUDE-01**: 通过 `claude-agent-sdk` 调用 Claude Code 处理用户消息
-- [ ] **CLAUDE-02**: 流式获取 Claude 响应（token-by-token）
-- [ ] **CLAUDE-03**: 多轮对话 — 同一会话保持上下文连续
-- [ ] **CLAUDE-04**: 每个活跃会话一个 asyncio Task，异常隔离不影响其他会话
+- [x] **CLAUDE-01**: 通过 `claude-agent-sdk` 调用 Claude Code 处理用户消息
+- [x] **CLAUDE-02**: 流式获取 Claude 响应（token-by-token）
+- [x] **CLAUDE-03**: 多轮对话 — 同一会话保持上下文连续
+- [x] **CLAUDE-04**: 每个活跃会话一个 asyncio Task，异常隔离不影响其他会话
 - [x] **CLAUDE-05**: 单条消息处理超时看门狗（防止僵死）
 - [x] **CLAUDE-06**: 可选的本地文件系统/命令执行能力（通过配置开启）
 
@@ -35,17 +35,17 @@
 
 ### Session Management (会话管理)
 
-- [ ] **SESS-01**: P2P 会话按 `open_id` 隔离
-- [ ] **SESS-02**: 群聊会话按 `chat_id` 共享上下文，但注入发送者身份（如 `[张三]: 消息内容`）以区分不同用户
-- [ ] **SESS-03**: `/new` 命令重置当前会话
+- [x] **SESS-01**: P2P 会话按 `open_id` 隔离
+- [x] **SESS-02**: 群聊会话按 `chat_id` 共享上下文，但注入发送者身份（如 `[张三]: 消息内容`）以区分不同用户
+- [x] **SESS-03**: `/new` 命令重置当前会话
 - [ ] **SESS-04**: `/help` 命令显示可用命令列表
 - [ ] **SESS-05**: 空闲会话自动清理（TTL 过期释放资源）
 
 ### Concurrency (并发控制)
 
-- [ ] **CONC-01**: 消息并行处理 — 多条消息可同时被不同 asyncio Task 处理
+- [x] **CONC-01**: 消息并行处理 — 多条消息可同时被不同 asyncio Task 处理
 - [x] **CONC-02**: 可配置最大并行数（`MAX_CONCURRENT_TASKS` 环境变量），超出时排队等待
-- [ ] **CONC-03**: 群聊内多用户消息并行处理 — 每条消息独立 Task，共享群聊对话历史，回复完成后追加到历史
+- [x] **CONC-03**: 群聊内多用户消息并行处理 — 每条消息独立 Task，共享群聊对话历史，回复完成后追加到历史
 
 ### Interaction (交互)
 
@@ -93,15 +93,15 @@
 | CONN-05 | Phase 1 | Complete |
 | CONN-06 | Phase 1 | Complete |
 | CARD-01 | Phase 1 | Complete |
-| CLAUDE-01 | Phase 2 | Pending |
-| CLAUDE-02 | Phase 2 | Pending |
-| CLAUDE-03 | Phase 2 | Pending |
-| CLAUDE-04 | Phase 2 | Pending |
+| CLAUDE-01 | Phase 2 | Complete |
+| CLAUDE-02 | Phase 2 | Complete |
+| CLAUDE-03 | Phase 2 | Complete |
+| CLAUDE-04 | Phase 2 | Complete |
 | CLAUDE-05 | Phase 2 | Complete |
 | CLAUDE-06 | Phase 2 | Complete |
-| SESS-01 | Phase 2 | Pending |
-| SESS-02 | Phase 2 | Pending |
-| SESS-03 | Phase 2 | Pending |
+| SESS-01 | Phase 2 | Complete |
+| SESS-02 | Phase 2 | Complete |
+| SESS-03 | Phase 2 | Complete |
 | CARD-02 | Phase 3 | Pending |
 | CARD-03 | Phase 3 | Pending |
 | CARD-04 | Phase 3 | Pending |
@@ -117,9 +117,9 @@
 | SESS-05 | Phase 4 | Pending |
 | INTER-01 | Phase 4 | Pending |
 | INTER-02 | Phase 4 | Pending |
-| CONC-01 | Phase 2 | Pending |
+| CONC-01 | Phase 2 | Complete |
 | CONC-02 | Phase 2 | Complete |
-| CONC-03 | Phase 2 | Pending |
+| CONC-03 | Phase 2 | Complete |
 
 ---
 *Defined: 2026-04-01*

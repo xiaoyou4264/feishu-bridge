@@ -49,11 +49,11 @@ Plans:
   6. Typing `/new` in a conversation resets context so the next reply has no memory of prior turns
   7. When MAX_CONCURRENT_TASKS is reached, new messages queue instead of being dropped
   8. In a group chat, two users sending messages simultaneously both receive independent parallel responses (not queued behind each other)
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 02-01-PLAN.md — Config extension (timeout, concurrency, tools) + card update/error functions
-- [ ] 02-02-PLAN.md — SessionManager (per-session ClaudeSDKClient) + Claude single-turn worker
+- [x] 02-02-PLAN.md — SessionManager (per-session ClaudeSDKClient) + Claude single-turn worker
 - [ ] 02-03-PLAN.md — Handler Claude dispatch, /new command, main.py SessionManager init
 **UI hint**: yes
 
@@ -90,6 +90,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Feishu Connectivity | 2/3 | In Progress|  |
-| 2. Claude Integration | 1/3 | In Progress | - |
+| 2. Claude Integration | 2/3 | In Progress|  |
 | 3. Streaming Card Renderer | 0/TBD | Not started | - |
 | 4. Stability and Operations | 0/TBD | Not started | - |

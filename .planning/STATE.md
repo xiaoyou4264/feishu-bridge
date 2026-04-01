@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN.md (Config + Card functions)
-last_updated: "2026-04-01T21:54:00Z"
+stopped_at: Completed 02-02-PLAN.md (SessionManager + Claude worker)
+last_updated: "2026-04-01T14:00:32.853Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
   percent: 25
 ---
 
@@ -54,6 +54,7 @@ Progress: [██░░░░░░░░] 25%
 *Updated after each plan completion*
 | Phase 01-feishu-connectivity P02 | 6min | 2 tasks | 5 files |
 | Phase 02-claude-integration P01 | 10min | 2 tasks | 6 files |
+| Phase 02-claude-integration P02 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - [Phase 02-01]: lark-oapi 1.5.3 has apatch on im.v1.message — use PatchMessageRequest + apatch for card updates (not BaseRequest)
 - [Phase 02-01]: CardKit v2 format {data: {schema: "2.0", header, body}} required — old flat format {header, elements} breaks tests
 - [Phase 02-01]: Mock load_dotenv in config tests — load_dotenv() re-populates env vars deleted by monkeypatch, breaks missing-var tests
+- [Phase 02-claude-integration]: Manual connect()/disconnect() on ClaudeSDKClient — session lifetime spans multiple handler calls, context manager would close after each query
+- [Phase 02-claude-integration]: Semaphore OUTER, session.lock INNER — reverse order risks circular-wait deadlock
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T21:54:00Z
-Stopped at: Completed 02-01-PLAN.md (Config + Card functions)
-Resume file: .planning/phases/02-claude-integration/02-02-PLAN.md
+Last session: 2026-04-01T14:00:32.850Z
+Stopped at: Completed 02-02-PLAN.md (SessionManager + Claude worker)
+Resume file: None
