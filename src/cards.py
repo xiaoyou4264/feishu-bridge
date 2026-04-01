@@ -6,21 +6,16 @@ import structlog
 
 logger = structlog.get_logger()
 
-# CardKit v2 thinking card template (per D-03: status card with header)
+# Interactive card template (per D-03: status card with header)
+# For msg_type="interactive", content is the card JSON directly (no "type"/"data" wrapper)
 THINKING_CARD_TEMPLATE: dict = {
-    "type": "card",
-    "data": {
-        "schema": "2.0",
-        "header": {
-            "title": {"tag": "plain_text", "content": "AI 助手"},
-            "template": "blue",
-        },
-        "body": {
-            "elements": [
-                {"tag": "markdown", "content": "**正在思考中...**\n\n_请稍候_"}
-            ]
-        },
+    "header": {
+        "title": {"tag": "plain_text", "content": "AI 助手"},
+        "template": "blue",
     },
+    "elements": [
+        {"tag": "markdown", "content": "**正在思考中...**\n\n_请稍候_"}
+    ],
 }
 
 
@@ -75,24 +70,18 @@ async def send_unsupported_type_card(
         msg_type: The unsupported message type string (e.g. "image", "file").
     """
     card = {
-        "type": "card",
-        "data": {
-            "schema": "2.0",
-            "header": {
-                "title": {"tag": "plain_text", "content": "AI 助手"},
-                "template": "orange",
-            },
-            "body": {
-                "elements": [
-                    {
-                        "tag": "markdown",
-                        "content": (
-                            f"暂不支持该类型消息（{msg_type}），请发送文字消息"
-                        ),
-                    }
-                ]
-            },
+        "header": {
+            "title": {"tag": "plain_text", "content": "AI 助手"},
+            "template": "orange",
         },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": (
+                    f"暂不支持该类型消息（{msg_type}），请发送文字消息"
+                ),
+            }
+        ],
     }
 
     card_content = json.dumps(card, ensure_ascii=False)

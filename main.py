@@ -43,13 +43,11 @@ def get_bot_open_id(client: lark.Client) -> str:
     Raises:
         RuntimeError: If the API call fails or returns no open_id.
     """
-    from lark_oapi.core.model import BaseRequest
-
-    request = BaseRequest(
-        http_method="GET",
-        uri="/open-apis/bot/v3/info",
-        token_types={"tenant_access_token"},
-    )
+    request = lark.BaseRequest.builder() \
+        .http_method(lark.HttpMethod.GET) \
+        .uri("/open-apis/bot/v3/info") \
+        .token_types({lark.AccessTokenType.TENANT}) \
+        .build()
     resp = client.request(request)
     if not resp.success():
         raise RuntimeError(
