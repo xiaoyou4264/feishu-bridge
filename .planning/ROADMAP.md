@@ -84,7 +84,12 @@ Plans:
   3. Sending SIGTERM causes all active Claude tasks to cancel gracefully and the process exits cleanly within 10 seconds
   4. Log output is structured JSON with event_id correlation, making it possible to trace a single message end-to-end
   5. A conversation session idle for longer than the configured TTL is automatically cleaned up; `/help` lists available commands
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Structured logging + event_id correlation, /help command, session TTL cleanup
+- [ ] 04-02-PLAN.md — Stop button, feedback buttons, task registry, exception hardening
+- [ ] 04-03-PLAN.md — SIGTERM graceful shutdown + systemd user service deployment
 
 ## Progress
 
@@ -96,4 +101,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Feishu Connectivity | 2/3 | In Progress|  |
 | 2. Claude Integration | 3/3 | Complete   | 2026-04-01 |
 | 3. Streaming Card Renderer | 0/2 | Planned    |  |
-| 4. Stability and Operations | 0/TBD | Not started | - |
+| 4. Stability and Operations | 0/3 | Planned | - |
