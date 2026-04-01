@@ -11,6 +11,7 @@ Starts the Feishu WebSocket long connection bot. On startup:
 """
 import asyncio
 import logging
+import signal
 import sys
 
 # CRITICAL (Pitfall 2): Import lark_oapi.ws FIRST before creating any event loop.
@@ -95,6 +96,21 @@ def configure_structlog(log_level: str, log_format: str) -> None:
     )
 
 
+async def _graceful_shutdown(loop: asyncio.AbstractEventLoop) -> None:
+    """Cancel all tasks, wait up to 10s, then stop the loop (STAB-02, D-32)."""
+    logger = structlog.get_logger()
+    tasks = [t for t in asyncio.all_tasks(loop) if t is not asyncio.current_task()]
+    logger.info("graceful_shutdown_cancelling", task_count=len(tasks))
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        done, pending = await asyncio.wait(tasks, timeout=10)
+        if pending:
+            logger.warning("graceful_shutdown_timeout", pending_count=len(pending))
+    logger.info("graceful_shutdown_complete")
+    loop.stop()
+
+
 def main() -> None:
     """Main entry point — validates config, starts WS client."""
     # 1. Load config (CONN-05) — exits if required vars missing
@@ -139,6 +155,20 @@ def main() -> None:
 
     # 6. Get the event loop (AFTER lark_oapi.ws import at top of module — Pitfall 2)
     loop = asyncio.get_event_loop()
+
+    # 6a. Register SIGTERM/SIGINT graceful shutdown handlers (STAB-02, D-31)
+    _shutdown_requested = False
+
+    def _handle_signal():
+        nonlocal _shutdown_requested
+        if _shutdown_requested:
+            return  # Prevent double-shutdown
+        _shutdown_requested = True
+        logger.info("shutdown_signal_received")
+        loop.create_task(_graceful_shutdown(loop))
+
+    loop.add_signal_handler(signal.SIGTERM, _handle_signal)
+    loop.add_signal_handler(signal.SIGINT, _handle_signal)
 
     # 6b. Start session TTL cleanup background task (SESS-05, D-37)
     cleanup_task = loop.create_task(
