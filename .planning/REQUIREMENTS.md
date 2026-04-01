@@ -8,11 +8,11 @@
 ### Connectivity (连接层)
 
 - [ ] **CONN-01**: 通过 `lark-oapi` WebSocket 长连接接收飞书消息事件（`im.message.receive_v1`）
-- [ ] **CONN-02**: 消息去重 — 对飞书重试的重复事件（相同 `event_id`，即每次投递的唯一标识）只处理一次
-- [ ] **CONN-03**: 群聊中仅在 @机器人 时响应，P2P 直聊始终响应
+- [x] **CONN-02**: 消息去重 — 对飞书重试的重复事件（相同 `event_id`，即每次投递的唯一标识）只处理一次
+- [x] **CONN-03**: 群聊中仅在 @机器人 时响应，P2P 直聊始终响应
 - [ ] **CONN-04**: WebSocket 断连后自动重连（需 `lark-oapi>=1.4.9`）
-- [ ] **CONN-05**: 环境变量配置（APP_ID、APP_SECRET、工作目录、日志级别等）
-- [ ] **CONN-06**: 解决与 mi-feishu MCP 共享应用凭据的事件竞争问题
+- [x] **CONN-05**: 环境变量配置（APP_ID、APP_SECRET、工作目录、日志级别等）
+- [x] **CONN-06**: 解决与 mi-feishu MCP 共享应用凭据的事件竞争问题
 
 ### Claude Integration (AI 接入)
 
@@ -87,11 +87,11 @@
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
 | CONN-01 | Phase 1 | Pending |
-| CONN-02 | Phase 1 | Pending |
-| CONN-03 | Phase 1 | Pending |
+| CONN-02 | Phase 1 | Complete |
+| CONN-03 | Phase 1 | Complete |
 | CONN-04 | Phase 1 | Pending |
-| CONN-05 | Phase 1 | Pending |
-| CONN-06 | Phase 1 | Pending |
+| CONN-05 | Phase 1 | Complete |
+| CONN-06 | Phase 1 | Complete |
 | CARD-01 | Phase 1 | Pending |
 | CLAUDE-01 | Phase 2 | Pending |
 | CLAUDE-02 | Phase 2 | Pending |

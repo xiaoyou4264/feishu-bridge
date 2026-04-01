@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-04-01T12:16:59.774Z"
+stopped_at: Completed 01-feishu-connectivity/01-01-PLAN.md
+last_updated: "2026-04-01T12:56:19.083Z"
 last_activity: 2026-04-01 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-feishu-connectivity P01 | 15 | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - [Pre-Phase 1]: Use `lark-oapi==1.5.3` (not 1.4.6) — auto-reconnect support requires this version
 - [Pre-Phase 1]: Use `claude-agent-sdk>=0.1.53` (not deprecated `claude-code-sdk`) — v0.1.53 fixes deadlock #780 and CLOSE_WAIT leak #665
 - [Pre-Phase 1]: CardKit PATCH batched at 300-500ms intervals — per-token PATCHing hits rate limits
+- [Phase 01-feishu-connectivity]: CONN-06: new independent Feishu app required — do NOT reuse cli_a92d11a974b89bcd to avoid event routing conflict
+- [Phase 01-feishu-connectivity]: event_id used for dedup key (not message_id) — unique per delivery attempt, tighter guard
+- [Phase 01-feishu-connectivity]: DeduplicationCache uses FIFO size-based eviction via OrderedDict — simple, sufficient for 2-5 user scale
 
 ### Pending Todos
 
@@ -76,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T12:16:59.771Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-feishu-connectivity/01-CONTEXT.md
+Last session: 2026-04-01T12:56:19.080Z
+Stopped at: Completed 01-feishu-connectivity/01-01-PLAN.md
+Resume file: None
