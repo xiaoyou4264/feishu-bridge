@@ -13,28 +13,25 @@ def build_help_card() -> str:
     Build a green /help card listing available commands.
 
     Returns:
-        JSON string in CardKit v2 format with green header and command list.
+        JSON string for msg_type="interactive" with green header and command list.
     """
     card = {
-        "schema": "2.0",
         "header": {
             "title": {"tag": "plain_text", "content": "AI 助手帮助"},
             "template": "green",
         },
-        "body": {
-            "elements": [
-                {
-                    "tag": "markdown",
-                    "content": (
-                        "**可用命令**\n\n"
-                        "- `/new` — 重置会话，开始新对话\n"
-                        "- `/help` — 显示此帮助信息\n"
-                    ),
-                }
-            ]
-        },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": (
+                    "**可用命令**\n\n"
+                    "- `/new` — 重置会话，开始新对话\n"
+                    "- `/help` — 显示此帮助信息\n"
+                ),
+            }
+        ],
     }
-    return json.dumps({"data": card}, ensure_ascii=False)
+    return json.dumps(card, ensure_ascii=False)
 
 
 def _build_card(header_template: str, body_text: str) -> str:
@@ -49,33 +46,27 @@ def _build_card(header_template: str, body_text: str) -> str:
         JSON string in CardKit v2 format (schema="2.0").
     """
     card = {
-        "schema": "2.0",
         "header": {
             "title": {"tag": "plain_text", "content": "AI 助手"},
             "template": header_template,
         },
-        "body": {
-            "elements": [
-                {"tag": "markdown", "content": body_text}
-            ]
-        },
+        "elements": [
+            {"tag": "markdown", "content": body_text}
+        ],
     }
-    return json.dumps({"data": card}, ensure_ascii=False)
+    return json.dumps(card, ensure_ascii=False)
 
 
-# Interactive card template (per D-03: status card with header)
-# For msg_type="interactive", content wraps card in {"data": {...}} with schema="2.0"
+# Interactive card template for msg_type="interactive"
+# IMPORTANT: Feishu interactive cards use flat format {header, elements}, NOT CardKit v2 {data: {schema, header, body}}
 THINKING_CARD_TEMPLATE: dict = {
-    "schema": "2.0",
     "header": {
         "title": {"tag": "plain_text", "content": "AI 助手"},
         "template": "blue",
     },
-    "body": {
-        "elements": [
-            {"tag": "markdown", "content": "**正在思考中...**\n\n_请稍候_"}
-        ]
-    },
+    "elements": [
+        {"tag": "markdown", "content": "**正在思考中...**\n\n_请稍候_"}
+    ],
 }
 
 
@@ -96,7 +87,7 @@ async def send_thinking_card(client: lark.Client, message_id: str) -> str:
     Raises:
         RuntimeError: If areply response is not successful.
     """
-    card_content = json.dumps({"data": THINKING_CARD_TEMPLATE}, ensure_ascii=False)
+    card_content = json.dumps(THINKING_CARD_TEMPLATE, ensure_ascii=False)
 
     request = (
         lark.im.v1.ReplyMessageRequest.builder()
@@ -158,21 +149,18 @@ async def send_unsupported_type_card(
 
 
 def _build_card_with_buttons(header_template: str, body_text: str, buttons: dict) -> str:
-    """Build a CardKit v2 card with markdown body and action buttons."""
+    """Build an interactive card with markdown body and action buttons."""
     card = {
-        "schema": "2.0",
         "header": {
             "title": {"tag": "plain_text", "content": "AI 助手"},
             "template": header_template,
         },
-        "body": {
-            "elements": [
-                {"tag": "markdown", "content": body_text},
-                buttons,
-            ]
-        },
+        "elements": [
+            {"tag": "markdown", "content": body_text},
+            buttons,
+        ],
     }
-    return json.dumps({"data": card}, ensure_ascii=False)
+    return json.dumps(card, ensure_ascii=False)
 
 
 def build_stop_button(reply_message_id: str) -> dict:

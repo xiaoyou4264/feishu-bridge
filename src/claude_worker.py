@@ -131,39 +131,22 @@ async def single_turn_worker(
     try:
         async with semaphore:  # OUTER: global concurrency cap
             async with session.lock:  # INNER: per-session serialization
-                manager = None
                 try:
-                    # Step 1: Create streaming card (per D-19, D-20)
-                    card_id = await create_streaming_card(api_client, stop_message_id=reply_message_id)
-                    # Step 2: Link CardKit card to IM message (per Pitfall 3)
-                    await patch_im_with_card_id(api_client, reply_message_id, card_id)
-                    # Step 3: Get tenant token and create CardStreamingManager (per D-22)
-                    from lark_oapi.core.token import TokenManager
-                    tenant_token = TokenManager.get_self_tenant_token(api_client._config)
-                    manager = CardStreamingManager(card_id=card_id, tenant_token=tenant_token)
-                    # Step 4: Start sequence and flush loop
-                    await manager.start()
-                    # Step 5: Run Claude with streaming callbacks
+                    # Simple path: run Claude, collect full response, update card once
+                    # TODO: Enable streaming path when CardKit API format is validated
                     result_text = await asyncio.wait_for(
-                        _run_claude_turn_streaming(session.client, prompt, manager),
+                        _run_claude_turn(session.client, prompt),
                         timeout=timeout,
                     )
-                    # Step 6: Finalize card (per D-27: remove typing indicator, finish sequence)
-                    await manager.finalize(result_text)
-                    # Step 7: Update IM card with final text + feedback buttons (INTER-02)
-                    feedback_buttons = build_feedback_buttons(reply_message_id)
-                    await update_card_content(api_client, reply_message_id, result_text, buttons=feedback_buttons)
+                    # Update card with final text
+                    # TODO: Re-enable feedback buttons after fixing card button format
+                    await update_card_content(api_client, reply_message_id, result_text)
                 except asyncio.TimeoutError:
                     logger.warning(
                         "claude_worker_timeout",
                         session_key=session.session_key,
                         timeout=timeout,
                     )
-                    if manager is not None:
-                        try:
-                            await manager.finalize("")
-                        except Exception:
-                            pass
                     try:
                         await send_error_card(
                             api_client,
@@ -195,11 +178,6 @@ async def single_turn_worker(
                         error=str(exc),
                         error_type=type(exc).__name__,
                     )
-                    if manager is not None:
-                        try:
-                            await manager.finalize("")  # Per Pitfall 4: ALWAYS close sequence
-                        except Exception:
-                            pass
                     try:
                         await send_error_card(
                             api_client,
