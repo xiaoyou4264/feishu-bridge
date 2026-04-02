@@ -103,6 +103,7 @@ async def single_turn_worker(
     api_client,
     semaphore: asyncio.Semaphore,
     timeout: float,
+    card_id: str | None = None,
 ) -> None:
     """
     Process one Claude turn with concurrency control, timeout, and streaming card.
@@ -132,15 +133,39 @@ async def single_turn_worker(
         async with semaphore:  # OUTER: global concurrency cap
             async with session.lock:  # INNER: per-session serialization
                 try:
-                    # Simple path: run Claude, collect full response, update card once
-                    # TODO: Enable streaming path when CardKit API format is validated
-                    result_text = await asyncio.wait_for(
-                        _run_claude_turn(session.client, prompt),
-                        timeout=timeout,
-                    )
-                    # Update card with final text
-                    # TODO: Re-enable feedback buttons after fixing card button format
-                    await update_card_content(api_client, reply_message_id, result_text)
+                    manager = None
+                    if card_id:
+                        # Streaming path: card already created and sent by handler
+                        try:
+                            from lark_oapi.core.token import TokenManager
+                            tenant_token = TokenManager.get_self_tenant_token(api_client._config)
+                            manager = CardStreamingManager(card_id=card_id, tenant_token=tenant_token)
+                            await manager.start()
+                            result_text = await asyncio.wait_for(
+                                _run_claude_turn_streaming(session.client, prompt, manager),
+                                timeout=timeout,
+                            )
+                            await manager.finalize(result_text)
+                        except Exception as stream_exc:
+                            logger.warning("streaming_fallback", error=str(stream_exc))
+                            if manager and not manager._finalized:
+                                try:
+                                    await manager.finalize("")
+                                except Exception:
+                                    pass
+                            # Fallback: collect full response, update card once
+                            result_text = await asyncio.wait_for(
+                                _run_claude_turn(session.client, prompt),
+                                timeout=timeout,
+                            )
+                            await update_card_content(api_client, reply_message_id, result_text)
+                    else:
+                        # Simple path: no card_id, use basic card update
+                        result_text = await asyncio.wait_for(
+                            _run_claude_turn(session.client, prompt),
+                            timeout=timeout,
+                        )
+                        await update_card_content(api_client, reply_message_id, result_text)
                 except asyncio.TimeoutError:
                     logger.warning(
                         "claude_worker_timeout",

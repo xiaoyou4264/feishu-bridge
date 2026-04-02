@@ -109,6 +109,35 @@ async def send_thinking_card(client: lark.Client, message_id: str) -> str:
     return resp.data.message_id
 
 
+async def send_streaming_reply(client: lark.Client, message_id: str) -> tuple[str, str]:
+    """
+    Create a CardKit streaming card and send it as a reply.
+
+    Returns (reply_message_id, card_id) — both needed for streaming updates.
+    """
+    card_id = await create_streaming_card(client)
+
+    content = json.dumps({"type": "card", "data": {"card_id": card_id}})
+    request = (
+        lark.im.v1.ReplyMessageRequest.builder()
+        .message_id(message_id)
+        .request_body(
+            lark.im.v1.ReplyMessageRequestBody.builder()
+            .msg_type("interactive")
+            .content(content)
+            .build()
+        )
+        .build()
+    )
+
+    resp = await client.im.v1.message.areply(request)
+    if not resp.success():
+        raise RuntimeError(f"Streaming reply failed: {resp.code} {resp.msg}")
+
+    logger.debug("streaming_reply_sent", message_id=message_id, reply_id=resp.data.message_id, card_id=card_id)
+    return resp.data.message_id, card_id
+
+
 async def send_unsupported_type_card(
     client: lark.Client, message_id: str, msg_type: str
 ) -> None:
@@ -164,7 +193,7 @@ def _build_card_with_buttons(header_template: str, body_text: str, buttons: dict
 
 
 def build_stop_button(reply_message_id: str) -> dict:
-    """Build a CardKit v2 action element with a Stop button."""
+    """Build a CardKit v2 action element with a Stop button using callback behaviors."""
     return {
         "tag": "action",
         "actions": [
@@ -172,10 +201,12 @@ def build_stop_button(reply_message_id: str) -> dict:
                 "tag": "button",
                 "text": {"tag": "plain_text", "content": "停止"},
                 "type": "danger",
-                "complex_interaction": True,
-                "width": "default",
-                "action_type": "callback",
-                "value": {"action": "stop", "message_id": reply_message_id},
+                "behaviors": [
+                    {
+                        "type": "callback",
+                        "value": {"action": "stop", "message_id": reply_message_id},
+                    }
+                ],
             }
         ],
     }
@@ -190,14 +221,14 @@ def build_feedback_buttons(reply_message_id: str) -> dict:
                 "tag": "button",
                 "text": {"tag": "plain_text", "content": "👍"},
                 "type": "default",
-                "action_type": "callback",
+                "action_type": "request",
                 "value": {"action": "thumbs_up", "message_id": reply_message_id},
             },
             {
                 "tag": "button",
                 "text": {"tag": "plain_text", "content": "👎"},
                 "type": "default",
-                "action_type": "callback",
+                "action_type": "request",
                 "value": {"action": "thumbs_down", "message_id": reply_message_id},
             },
         ],
@@ -300,12 +331,24 @@ async def create_streaming_card(client: lark.Client, stop_message_id: str | None
     Raises:
         RuntimeError: If card creation fails.
     """
-    elements: list[dict] = [{"tag": "markdown", "content": "**正在思考中...**"}]
-    if stop_message_id is not None:
-        elements.append(build_stop_button(stop_message_id))
+    from src.card_streaming import STREAMING_ELEMENT_ID
+
+    # NOTE: CardKit v2 schema does NOT support "action" tag (buttons).
+    # Stop button cannot be in the streaming card. It would need a separate mechanism.
+    elements: list[dict] = [
+        {"tag": "markdown", "content": "**正在思考中...**", "element_id": STREAMING_ELEMENT_ID}
+    ]
 
     card_template = {
         "schema": "2.0",
+        "config": {
+            "streaming_mode": True,
+            "streaming_config": {
+                "print_frequency_ms": {"default": 50},
+                "print_step": {"default": 2},
+                "print_strategy": "fast",
+            },
+        },
         "header": {
             "title": {"tag": "plain_text", "content": "AI 助手"},
             "template": "blue",
@@ -319,6 +362,7 @@ async def create_streaming_card(client: lark.Client, stop_message_id: str | None
         lark.cardkit.v1.CreateCardRequest.builder()
         .request_body(
             lark.cardkit.v1.CreateCardRequestBody.builder()
+            .type("card_json")
             .data(json.dumps(card_template, ensure_ascii=False))
             .build()
         )
@@ -350,7 +394,8 @@ async def patch_im_with_card_id(
     Raises:
         RuntimeError: If patch fails.
     """
-    card_content = json.dumps({"card_id": card_id}, ensure_ascii=False)
+    # Correct format for sending CardKit card via IM: {"type": "card", "data": {"card_id": xxx}}
+    card_content = json.dumps({"type": "card", "data": {"card_id": card_id}}, ensure_ascii=False)
 
     request = (
         lark.im.v1.PatchMessageRequest.builder()

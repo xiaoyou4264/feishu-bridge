@@ -12,7 +12,7 @@ import lark_oapi as lark
 import structlog
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-from src.cards import send_thinking_card, send_unsupported_type_card
+from src.cards import send_thinking_card, send_streaming_reply, send_unsupported_type_card
 from src.claude_worker import single_turn_worker
 from src.filters import should_respond, parse_message_content
 from src.session import SessionManager, get_session_key, get_display_name, format_prompt
@@ -254,13 +254,20 @@ async def handle_message(
                 logger.info("session_reset", event_id=event_id, session_key=session_key)
                 return
 
-            # Step 7: Send thinking card (CARD-01)
-            reply_id = await send_thinking_card(api_client, message.message_id)
+            # Step 7: Send streaming CardKit card as reply (CARD-01 + CARD-02)
+            # Try streaming card first; fall back to simple thinking card
+            card_id = None
+            try:
+                reply_id, card_id = await send_streaming_reply(api_client, message.message_id)
+            except Exception as stream_err:
+                logger.warning("streaming_reply_fallback", error=str(stream_err))
+                reply_id = await send_thinking_card(api_client, message.message_id)
             logger.info(
                 "thinking_card_sent",
                 event_id=event_id,
                 message_id=message.message_id,
                 reply_id=reply_id,
+                card_id=card_id,
                 msg_type=msg_type,
             )
 
@@ -291,6 +298,7 @@ async def handle_message(
                     api_client=api_client,
                     semaphore=session_manager.semaphore,
                     timeout=config.claude_timeout,
+                    card_id=card_id,
                 )
             )
             logger.info("claude_task_dispatched", event_id=event_id, session_key=session_key)
