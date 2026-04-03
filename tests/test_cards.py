@@ -132,7 +132,7 @@ class TestSendThinkingCard:
         request_body = call_args.request_body
         content = json.loads(request_body.content)
         header = content["data"]["header"]
-        assert header["title"]["content"] == "AI 助手"
+        assert header["title"]["content"] == "小爱深思熟虑中~"
         assert header["template"] == "blue"
 
     @pytest.mark.asyncio
@@ -222,8 +222,8 @@ class TestUpdateCardContent:
         call_args = mock_client.im.v1.message.apatch.call_args[0][0]
         request_body = call_args.request_body
         content = json.loads(request_body.content)
-        # Check header is blue and title is AI 助手
-        assert content["data"]["header"]["title"]["content"] == "AI 助手"
+        # Check header is blue and title is dynamic (extracted from text)
+        assert content["data"]["header"]["title"]["content"] == "小爱大功告成！"
         assert content["data"]["header"]["template"] == "blue"
         # Check body contains the text
         elements = content["data"]["body"]["elements"]
@@ -264,8 +264,8 @@ class TestSendErrorCard:
         call_args = mock_client.im.v1.message.apatch.call_args[0][0]
         request_body = call_args.request_body
         content = json.loads(request_body.content)
-        # Check header is red
-        assert content["data"]["header"]["title"]["content"] == "AI 助手"
+        # Check header is red with error title
+        assert content["data"]["header"]["title"]["content"] == "小爱出了点岔子"
         assert content["data"]["header"]["template"] == "red"
 
     @pytest.mark.asyncio

@@ -17,7 +17,7 @@ def build_help_card() -> str:
     """
     card = {
         "header": {
-            "title": {"tag": "plain_text", "content": "AI 助手帮助"},
+            "title": {"tag": "plain_text", "content": "小爱使用指南"},
             "template": "green",
         },
         "elements": [
@@ -26,6 +26,9 @@ def build_help_card() -> str:
                 "content": (
                     "**可用命令**\n\n"
                     "- `/new` — 重置会话，开始新对话\n"
+                    "- `/status` — 查看运行状态\n"
+                    "- `/model` — 查看当前模型配置\n"
+                    "- `/restart` — 重启所有 Claude 连接\n"
                     "- `/help` — 显示此帮助信息\n"
                 ),
             }
@@ -34,13 +37,21 @@ def build_help_card() -> str:
     return json.dumps(card, ensure_ascii=False)
 
 
-def _build_card(header_template: str, body_text: str) -> str:
+# Stage-specific card titles
+TITLE_THINKING = "小爱深思熟虑中~"
+TITLE_STREAMING = "小爱正在殴打你的任务"
+TITLE_DONE = "小爱大功告成！"
+TITLE_ERROR = "小爱出了点岔子"
+
+
+def _build_card(header_template: str, body_text: str, title: str = TITLE_DONE) -> str:
     """
     Build a CardKit v2 interactive card JSON string.
 
     Args:
         header_template: Feishu header color template (e.g. "blue", "red", "orange").
         body_text: Markdown text content for the card body.
+        title: Card header title text.
 
     Returns:
         JSON string in CardKit v2 format (schema="2.0") wrapped in {"data": {...}}.
@@ -49,7 +60,7 @@ def _build_card(header_template: str, body_text: str) -> str:
         "data": {
             "schema": "2.0",
             "header": {
-                "title": {"tag": "plain_text", "content": "AI 助手"},
+                "title": {"tag": "plain_text", "content": title},
                 "template": header_template,
             },
             "body": {
@@ -67,7 +78,7 @@ THINKING_CARD_TEMPLATE: dict = {
     "data": {
         "schema": "2.0",
         "header": {
-            "title": {"tag": "plain_text", "content": "AI 助手"},
+            "title": {"tag": "plain_text", "content": TITLE_THINKING},
             "template": "blue",
         },
         "body": {
@@ -186,13 +197,13 @@ async def send_unsupported_type_card(
         )
 
 
-def _build_card_with_buttons(header_template: str, body_text: str, buttons: dict) -> str:
+def _build_card_with_buttons(header_template: str, body_text: str, buttons: dict, title: str = TITLE_DONE) -> str:
     """Build an interactive card with markdown body and action buttons (CardKit v2 format)."""
     card = {
         "data": {
             "schema": "2.0",
             "header": {
-                "title": {"tag": "plain_text", "content": "AI 助手"},
+                "title": {"tag": "plain_text", "content": title},
                 "template": header_template,
             },
             "body": {
@@ -251,10 +262,10 @@ def build_feedback_buttons(reply_message_id: str) -> dict:
 
 
 async def update_card_content(
-    client: lark.Client, message_id: str, text: str, buttons: dict | None = None
+    client: lark.Client, message_id: str, text: str, buttons: dict | None = None, title: str = TITLE_DONE
 ) -> None:
     """
-    Patch an existing card message with new markdown text (blue header).
+    Patch an existing card message with new markdown text.
 
     Used to update the "thinking" card with Claude's actual response.
 
@@ -263,14 +274,15 @@ async def update_card_content(
         message_id: The reply_message_id of the card to patch (returned by send_thinking_card).
         text: Markdown text to display in the card body.
         buttons: Optional CardKit v2 action element to append to the card body.
+        title: Card header title text.
 
     Raises:
         RuntimeError: If the patch response is not successful.
     """
     if buttons is not None:
-        card_content = _build_card_with_buttons(header_template="blue", body_text=text, buttons=buttons)
+        card_content = _build_card_with_buttons(header_template="blue", body_text=text, buttons=buttons, title=title)
     else:
-        card_content = _build_card(header_template="blue", body_text=text)
+        card_content = _build_card(header_template="blue", body_text=text, title=title)
 
     request = (
         lark.im.v1.PatchMessageRequest.builder()
@@ -306,6 +318,7 @@ async def send_error_card(
     card_content = _build_card(
         header_template="red",
         body_text=f"出错了: {error_text}",
+        title=TITLE_ERROR,
     )
 
     request = (
@@ -364,7 +377,7 @@ async def create_streaming_card(client: lark.Client, stop_message_id: str | None
             },
         },
         "header": {
-            "title": {"tag": "plain_text", "content": "AI 助手"},
+            "title": {"tag": "plain_text", "content": TITLE_STREAMING},
             "template": "blue",
         },
         "body": {

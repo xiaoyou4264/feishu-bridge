@@ -7,9 +7,13 @@ Provides:
 """
 import asyncio
 import json
+import time
 
 import lark_oapi as lark
 import structlog
+
+# Module-level start time for /status uptime reporting
+_start_time = time.monotonic()
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from src.cards import send_thinking_card, send_streaming_reply, send_unsupported_type_card
@@ -228,16 +232,13 @@ async def handle_message(
 
                 # Send green confirmation card via areply
                 card = {
-                    "schema": "2.0",
                     "header": {
-                        "title": {"tag": "plain_text", "content": "AI 助手"},
+                        "title": {"tag": "plain_text", "content": "小爱收到~"},
                         "template": "green",
                     },
-                    "body": {
-                        "elements": [
-                            {"tag": "markdown", "content": "会话已重置，开始新对话吧！"}
-                        ]
-                    },
+                    "elements": [
+                        {"tag": "markdown", "content": "会话已重置，开始新对话吧！"}
+                    ],
                 }
                 request = (
                     lark.im.v1.ReplyMessageRequest.builder()
@@ -245,7 +246,7 @@ async def handle_message(
                     .request_body(
                         lark.im.v1.ReplyMessageRequestBody.builder()
                         .msg_type("interactive")
-                        .content(json.dumps({"data": card}, ensure_ascii=False))
+                        .content(json.dumps(card, ensure_ascii=False))
                         .build()
                     )
                     .build()
@@ -254,8 +255,113 @@ async def handle_message(
                 logger.info("session_reset", event_id=event_id, session_key=session_key)
                 return
 
+            # Step 6b: /status command — show runtime status
+            if text.strip().lower() == "/status":
+                uptime_secs = int(time.monotonic() - _start_time)
+                hours, remainder = divmod(uptime_secs, 3600)
+                mins, secs = divmod(remainder, 60)
+                uptime_str = f"{hours}h{mins}m{secs}s" if hours else f"{mins}m{secs}s"
+                active_sessions = len(session_manager._sessions)
+                from src.claude_worker import _active_tasks, _queue
+                active_tasks = len(_active_tasks)
+                queue_len = len(_queue)
+
+                status_text = (
+                    f"**运行状态**\n\n"
+                    f"⏱ 运行时长：`{uptime_str}`\n"
+                    f"💬 活跃会话：`{active_sessions}`\n"
+                    f"⚡ 进行中任务：`{active_tasks}`\n"
+                    f"📋 排队中：`{queue_len}`\n"
+                    f"🔧 工作目录：`{config.working_dir}`\n"
+                    f"⏰ 超时设置：`{config.claude_timeout}s`\n"
+                    f"🔒 最大并发：`{config.max_concurrent_tasks}`"
+                )
+                card = {
+                    "header": {
+                        "title": {"tag": "plain_text", "content": "小爱运行状态"},
+                        "template": "blue",
+                    },
+                    "elements": [{"tag": "markdown", "content": status_text}],
+                }
+                request = (
+                    lark.im.v1.ReplyMessageRequest.builder()
+                    .message_id(message.message_id)
+                    .request_body(
+                        lark.im.v1.ReplyMessageRequestBody.builder()
+                        .msg_type("interactive")
+                        .content(json.dumps(card, ensure_ascii=False))
+                        .build()
+                    )
+                    .build()
+                )
+                await api_client.im.v1.message.areply(request)
+                logger.info("status_command", event_id=event_id)
+                return
+
+            # Step 6c: /model command — show current model info
+            if text.strip().lower() == "/model":
+                model_name = getattr(session_manager._options, 'model', None) or "默认 (claude-sonnet-4-20250514)"
+                permission = session_manager._options.permission_mode or "default"
+                model_text = (
+                    f"**当前模型配置**\n\n"
+                    f"🤖 模型：`{model_name}`\n"
+                    f"🔑 权限模式：`{permission}`\n"
+                    f"🛠 工具限制：`{'无限制' if not config.allowed_tools else ', '.join(config.allowed_tools)}`"
+                )
+                card = {
+                    "header": {
+                        "title": {"tag": "plain_text", "content": "小爱模型信息"},
+                        "template": "purple",
+                    },
+                    "elements": [{"tag": "markdown", "content": model_text}],
+                }
+                request = (
+                    lark.im.v1.ReplyMessageRequest.builder()
+                    .message_id(message.message_id)
+                    .request_body(
+                        lark.im.v1.ReplyMessageRequestBody.builder()
+                        .msg_type("interactive")
+                        .content(json.dumps(card, ensure_ascii=False))
+                        .build()
+                    )
+                    .build()
+                )
+                await api_client.im.v1.message.areply(request)
+                logger.info("model_command", event_id=event_id)
+                return
+
+            # Step 6d: /restart command — destroy all sessions, reconnect fresh
+            if text.strip().lower() == "/restart":
+                session_keys = list(session_manager._sessions.keys())
+                for key in session_keys:
+                    await session_manager.destroy(key)
+                card = {
+                    "header": {
+                        "title": {"tag": "plain_text", "content": "小爱已重启"},
+                        "template": "green",
+                    },
+                    "elements": [
+                        {"tag": "markdown", "content": f"已断开 **{len(session_keys)}** 个会话的 Claude 连接并重新初始化。\n\n下次发消息时会自动建立新连接。"}
+                    ],
+                }
+                request = (
+                    lark.im.v1.ReplyMessageRequest.builder()
+                    .message_id(message.message_id)
+                    .request_body(
+                        lark.im.v1.ReplyMessageRequestBody.builder()
+                        .msg_type("interactive")
+                        .content(json.dumps(card, ensure_ascii=False))
+                        .build()
+                    )
+                    .build()
+                )
+                await api_client.im.v1.message.areply(request)
+                logger.info("restart_command", event_id=event_id, sessions_destroyed=len(session_keys))
+                return
+
             # Step 7: Send streaming CardKit card as reply (CARD-01 + CARD-02)
             card_id = None
+            think_start = time.monotonic()
             try:
                 reply_id, card_id = await send_streaming_reply(api_client, message.message_id)
             except Exception as stream_err:
@@ -298,6 +404,7 @@ async def handle_message(
                     api_client=api_client,
                     semaphore=session_manager.semaphore,
                     timeout=config.claude_timeout,
+                    think_start=think_start,
                 )
             )
             logger.info("claude_task_dispatched", event_id=event_id, session_key=session_key)

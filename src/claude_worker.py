@@ -135,14 +135,15 @@ async def _update_queue_cards():
 
 
 async def _show_error(card_id, manager, api_client, reply_message_id, error_text):
-    """Show error message — via CardKit PUT for v2 cards, via IM patch for v1 cards."""
+    """Show error message — via CardKit PUT for streaming cards, via IM patch for simple cards."""
     try:
         if card_id and manager:
-            # v2 card: finalize with error text (closes streaming mode)
+            # Streaming card: finalize with error text (updates content + closes streaming mode)
+            # Do NOT attempt IM patch — streaming cards reject card JSON format changes
             if not manager._finalized:
-                await manager.finalize(f"❌ {error_text}")
+                await manager.finalize(f"❌ {error_text}", is_error=True)
         else:
-            # v1 card: use IM patch
+            # Simple card: use IM patch
             await send_error_card(api_client, reply_message_id, error_text)
     except Exception as e:
         logger.error("show_error_failed", error=str(e))
@@ -156,6 +157,7 @@ async def single_turn_worker(
     semaphore: asyncio.Semaphore,
     timeout: float,
     card_id: str | None = None,
+    think_start: float | None = None,
 ) -> None:
     """
     Process one Claude turn with concurrency control, timeout, and streaming card.
@@ -192,6 +194,14 @@ async def single_turn_worker(
         await _update_queue_cards()
         logger.info("task_queued", reply_id=reply_message_id, position=len(_queue))
 
+    # Create and start streaming manager early — timer runs during think/queue phase
+    manager = None
+    if card_id:
+        from lark_oapi.core.token import TokenManager
+        tenant_token = TokenManager.get_self_tenant_token(api_client._config)
+        manager = CardStreamingManager(card_id=card_id, tenant_token=tenant_token, think_start=think_start)
+        await manager.start()
+
     try:
         async with semaphore:  # OUTER: global concurrency cap
             # Remove from queue when we get the semaphore
@@ -202,14 +212,10 @@ async def single_turn_worker(
                 await _update_queue_cards()
                 logger.info("task_dequeued", reply_id=reply_message_id)
             async with session.lock:  # INNER: per-session serialization
-                manager = None
                 try:
-                    if card_id:
-                        # Streaming path: card already created and sent by handler
-                        from lark_oapi.core.token import TokenManager
-                        tenant_token = TokenManager.get_self_tenant_token(api_client._config)
-                        manager = CardStreamingManager(card_id=card_id, tenant_token=tenant_token)
-                        await manager.start()
+                    if card_id and manager:
+                        # Streaming path: manager already running, mark stream start
+                        manager.mark_stream_start()
                         try:
                             result_text = await asyncio.wait_for(
                                 _run_claude_turn_streaming(session.client, prompt, manager),
@@ -219,7 +225,8 @@ async def single_turn_worker(
                             # Always finalize — ensures streaming_mode is closed
                             if not manager._finalized:
                                 await manager.finalize(result_text if 'result_text' in dir() else "")
-                        # Streaming done — no IM patch needed (v2 card updated via PUT element content)
+                        # Streaming done — content updated via CardKit PUT element API
+                        # Header can't be changed on streaming cards (settings API and IM patch both fail)
                     else:
                         # Simple path: no card_id, use basic card update
                         result_text = await asyncio.wait_for(
