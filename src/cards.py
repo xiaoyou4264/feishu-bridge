@@ -43,30 +43,39 @@ def _build_card(header_template: str, body_text: str) -> str:
         body_text: Markdown text content for the card body.
 
     Returns:
-        JSON string in CardKit v2 format (schema="2.0").
+        JSON string in CardKit v2 format (schema="2.0") wrapped in {"data": {...}}.
     """
     card = {
-        "header": {
-            "title": {"tag": "plain_text", "content": "AI 助手"},
-            "template": header_template,
-        },
-        "elements": [
-            {"tag": "markdown", "content": body_text}
-        ],
+        "data": {
+            "schema": "2.0",
+            "header": {
+                "title": {"tag": "plain_text", "content": "AI 助手"},
+                "template": header_template,
+            },
+            "body": {
+                "elements": [
+                    {"tag": "markdown", "content": body_text}
+                ]
+            },
+        }
     }
     return json.dumps(card, ensure_ascii=False)
 
 
-# Interactive card template for msg_type="interactive"
-# IMPORTANT: Feishu interactive cards use flat format {header, elements}, NOT CardKit v2 {data: {schema, header, body}}
+# Interactive card template for msg_type="interactive" — CardKit v2 format
 THINKING_CARD_TEMPLATE: dict = {
-    "header": {
-        "title": {"tag": "plain_text", "content": "AI 助手"},
-        "template": "blue",
-    },
-    "elements": [
-        {"tag": "markdown", "content": "**正在思考中...**\n\n_请稍候_"}
-    ],
+    "data": {
+        "schema": "2.0",
+        "header": {
+            "title": {"tag": "plain_text", "content": "AI 助手"},
+            "template": "blue",
+        },
+        "body": {
+            "elements": [
+                {"tag": "markdown", "content": "**正在思考中...**\n\n_请稍候_"}
+            ]
+        },
+    }
 }
 
 
@@ -178,16 +187,21 @@ async def send_unsupported_type_card(
 
 
 def _build_card_with_buttons(header_template: str, body_text: str, buttons: dict) -> str:
-    """Build an interactive card with markdown body and action buttons."""
+    """Build an interactive card with markdown body and action buttons (CardKit v2 format)."""
     card = {
-        "header": {
-            "title": {"tag": "plain_text", "content": "AI 助手"},
-            "template": header_template,
-        },
-        "elements": [
-            {"tag": "markdown", "content": body_text},
-            buttons,
-        ],
+        "data": {
+            "schema": "2.0",
+            "header": {
+                "title": {"tag": "plain_text", "content": "AI 助手"},
+                "template": header_template,
+            },
+            "body": {
+                "elements": [
+                    {"tag": "markdown", "content": body_text},
+                    buttons,
+                ]
+            },
+        }
     }
     return json.dumps(card, ensure_ascii=False)
 

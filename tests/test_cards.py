@@ -57,7 +57,7 @@ class TestPatchImWithCardId:
         mock_client.im.v1.message.apatch.assert_called_once()
         call_args = mock_client.im.v1.message.apatch.call_args[0][0]
         content = json.loads(call_args.request_body.content)
-        assert content["card_id"] == "card_abc"
+        assert content["data"]["card_id"] == "card_abc"
 
     @pytest.mark.asyncio
     async def test_raises_on_patch_failure(self):
