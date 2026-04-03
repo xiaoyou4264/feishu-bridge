@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Project scaffolding, config validation, dedup cache, message filters
 - [x] 01-02-PLAN.md — Card reply functions, event handler pipeline, main entry point
-- [ ] 01-03-PLAN.md — End-to-end verification with real Feishu app (checkpoint)
+- [x] 01-03-PLAN.md — End-to-end verification with real Feishu app (checkpoint)
 
 ### Phase 2: Claude Integration
 **Goal**: Users receive real Claude responses — the full message pipeline from Feishu message to Claude reply works end-to-end, with each conversation isolated in its own asyncio Task
