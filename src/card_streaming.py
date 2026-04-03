@@ -5,6 +5,7 @@ Requires: card JSON with streaming_mode=true and element with element_id.
 """
 import asyncio
 import json
+import time
 from typing import Any
 
 import httpx
@@ -50,6 +51,7 @@ class CardStreamingManager:
         self._client = httpx.AsyncClient(timeout=10.0)
         self._flush_task: asyncio.Task | None = None
         self._finalized = False
+        self._start_time: float = time.monotonic()
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -103,7 +105,9 @@ class CardStreamingManager:
         self._buffer.clear()
         final = final_text or self._full_text
         if final:
-            content = self._build_display_text(final, include_typing=False)
+            # Append elapsed time to final content
+            final_with_time = f"{final}\n\n---\n\n`✅ 完成 · ⏱ {self._elapsed()}`"
+            content = self._build_display_text(final_with_time, include_typing=False)
             await self._put_content(content)
 
         # Wait for client to render final text before closing streaming mode
@@ -114,29 +118,42 @@ class CardStreamingManager:
         self._finalized = True
         await self._client.aclose()
 
+    def _elapsed(self) -> str:
+        """Format elapsed time since start (integer seconds)."""
+        secs = int(time.monotonic() - self._start_time)
+        if secs < 60:
+            return f"{secs}s"
+        mins = secs // 60
+        remaining = secs % 60
+        return f"{mins}m{remaining}s"
+
     def _build_display_text(self, text: str, include_typing: bool = True) -> str:
-        """Build display content: compact tool line + text + optional typing indicator."""
+        """Build display content: compact tool line + text + optional typing/timer indicator."""
         parts = []
         if self._tool_blocks:
-            # All tools on one line, separated by spaces
             parts.append(" ".join(self._tool_blocks))
         if text:
             parts.append(text)
         if include_typing:
-            parts.append("_正在输入..._")
-        return "\n\n".join(parts) if parts else "_正在输入..._"
+            parts.append(f"_正在输入..._\n\n---\n\n`⏱ {self._elapsed()}`")
+        return "\n\n".join(parts) if parts else f"_正在输入..._\n\n---\n\n`⏱ {self._elapsed()}`"
 
     async def _flush_loop(self) -> None:
-        """Periodic flush: merge buffer into full_text and PUT update."""
+        """Periodic flush: merge buffer into full_text and PUT update. Always update timer."""
         try:
+            last_put_text = ""
             while True:
                 await asyncio.sleep(self.flush_interval)
-                if self._buffer or self._dirty:
+                if self._buffer:
                     self._full_text += "".join(self._buffer)
                     self._buffer.clear()
                     self._dirty = False
-                    content = self._build_display_text(self._full_text, include_typing=True)
+                # Always rebuild content (timer changes every tick)
+                content = self._build_display_text(self._full_text, include_typing=True)
+                # Only PUT if content actually changed (text or timer second changed)
+                if content != last_put_text:
                     await self._put_content(content)
+                    last_put_text = content
         except asyncio.CancelledError:
             pass
 
