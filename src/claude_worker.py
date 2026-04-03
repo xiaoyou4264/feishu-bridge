@@ -23,6 +23,10 @@ logger = structlog.get_logger()
 # Module-level registry: reply_message_id -> asyncio.Task (D-41)
 _active_tasks: dict[str, asyncio.Task] = {}
 
+# Global queue tracking for queue position display
+_queue: list[dict] = []  # [{"reply_id": str, "card_id": str|None, "prompt_preview": str, "api_client": any}]
+_queue_lock = asyncio.Lock()
+
 
 def cancel_task_for_message(message_id: str) -> bool:
     """Cancel the task for a given message_id. Returns True if found and cancelled."""
@@ -104,6 +108,32 @@ async def _run_claude_turn_streaming(
     return "".join(full_text_parts)
 
 
+async def _update_queue_cards():
+    """Update all queued cards with their current position."""
+    async with _queue_lock:
+        for i, entry in enumerate(_queue):
+            position = i + 1
+            total = len(_queue)
+            try:
+                if entry["card_id"]:
+                    # v2 streaming card: PUT element content
+                    from lark_oapi.core.token import TokenManager
+                    token = TokenManager.get_self_tenant_token(entry["api_client"]._config)
+                    import httpx
+                    url = f"https://open.feishu.cn/open-apis/cardkit/v1/cards/{entry['card_id']}/elements/md_stream/content"
+                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+                    text = f"⏳ **排队中** ({position}/{total})\n\n前方还有 {position - 1} 个任务"
+                    entry["seq"] = entry.get("seq", 0) + 1
+                    async with httpx.AsyncClient(timeout=5) as http:
+                        await http.put(url, headers=headers, json={"content": text, "sequence": entry["seq"]})
+                else:
+                    # v1 card: use IM patch
+                    await update_card_content(entry["api_client"], entry["reply_id"],
+                                              f"⏳ **排队中** ({position}/{total})\n\n前方还有 {position - 1} 个任务")
+            except Exception as e:
+                logger.debug("queue_card_update_failed", error=str(e))
+
+
 async def _show_error(card_id, manager, api_client, reply_message_id, error_text):
     """Show error message — via CardKit PUT for v2 cards, via IM patch for v1 cards."""
     try:
@@ -151,8 +181,26 @@ async def single_turn_worker(
     # Register current task in active registry (D-41)
     current_task = asyncio.current_task()
     _active_tasks[reply_message_id] = current_task
+
+    # Check if we need to queue (semaphore full)
+    queue_entry = {"reply_id": reply_message_id, "card_id": card_id,
+                   "prompt_preview": prompt[:30], "api_client": api_client, "seq": 0}
+    need_queue = semaphore._value == 0  # All slots taken
+    if need_queue:
+        async with _queue_lock:
+            _queue.append(queue_entry)
+        await _update_queue_cards()
+        logger.info("task_queued", reply_id=reply_message_id, position=len(_queue))
+
     try:
         async with semaphore:  # OUTER: global concurrency cap
+            # Remove from queue when we get the semaphore
+            if need_queue:
+                async with _queue_lock:
+                    if queue_entry in _queue:
+                        _queue.remove(queue_entry)
+                await _update_queue_cards()
+                logger.info("task_dequeued", reply_id=reply_message_id)
             async with session.lock:  # INNER: per-session serialization
                 manager = None
                 try:
