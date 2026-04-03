@@ -255,7 +255,6 @@ async def handle_message(
                 return
 
             # Step 7: Send streaming CardKit card as reply (CARD-01 + CARD-02)
-            # Try streaming card first; fall back to simple thinking card
             card_id = None
             try:
                 reply_id, card_id = await send_streaming_reply(api_client, message.message_id)
@@ -295,10 +294,10 @@ async def handle_message(
                     session=session,
                     prompt=prompt,
                     reply_message_id=reply_id,
+                    card_id=card_id,
                     api_client=api_client,
                     semaphore=session_manager.semaphore,
                     timeout=config.claude_timeout,
-                    card_id=card_id,
                 )
             )
             logger.info("claude_task_dispatched", event_id=event_id, session_key=session_key)

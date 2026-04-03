@@ -139,6 +139,7 @@ def main() -> None:
     claude_options = ClaudeAgentOptions(
         permission_mode="acceptEdits",   # non-interactive, auto-approve edits
         cwd=config.working_dir,          # from WORKING_DIR env var
+        include_partial_messages=True,   # Enable token-level streaming for typing effect
     )
     # Add allowed_tools only if configured (empty list = all tools allowed)
     if config.allowed_tools:

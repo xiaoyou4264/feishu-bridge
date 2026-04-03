@@ -12,7 +12,7 @@ import asyncio
 import uuid
 
 import structlog
-from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, TextBlock, ToolUseBlock, ToolResultBlock
+from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, StreamEvent, TextBlock, ToolUseBlock, ToolResultBlock
 
 from src.card_streaming import CardStreamingManager
 from src.cards import send_error_card, update_card_content, create_streaming_card, patch_im_with_card_id, build_feedback_buttons
@@ -80,20 +80,42 @@ async def _run_claude_turn_streaming(
         Concatenated text from all AssistantMessage TextBlocks.
     """
     await client.query(prompt)
-    text_parts: list[str] = []
+    full_text_parts: list[str] = []
     async for msg in client.receive_response():
-        if isinstance(msg, AssistantMessage):
+        if isinstance(msg, StreamEvent):
+            # Raw Anthropic API stream event — extract text deltas
+            event = msg.event
+            event_type = event.get("type", "")
+            if event_type == "content_block_delta":
+                delta = event.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    text = delta.get("text", "")
+                    if text:
+                        full_text_parts.append(text)
+                        await manager.append_text(text)
+        elif isinstance(msg, AssistantMessage):
+            # Final complete message — extract any tool use/result blocks
             for block in msg.content:
-                if isinstance(block, TextBlock):
-                    text_parts.append(block.text)
-                    await manager.append_text(block.text)
-                elif isinstance(block, ToolUseBlock):
+                if isinstance(block, ToolUseBlock):
                     await manager.append_tool_use(block.name, block.input)
                 elif isinstance(block, ToolResultBlock):
                     content = block.content if isinstance(block.content, str) else str(block.content or "")
                     await manager.append_tool_result(content, bool(block.is_error))
-        # ResultMessage ends the iterator automatically — no explicit break needed
-    return "".join(text_parts)
+    return "".join(full_text_parts)
+
+
+async def _show_error(card_id, manager, api_client, reply_message_id, error_text):
+    """Show error message — via CardKit PUT for v2 cards, via IM patch for v1 cards."""
+    try:
+        if card_id and manager:
+            # v2 card: finalize with error text (closes streaming mode)
+            if not manager._finalized:
+                await manager.finalize(f"❌ {error_text}")
+        else:
+            # v1 card: use IM patch
+            await send_error_card(api_client, reply_message_id, error_text)
+    except Exception as e:
+        logger.error("show_error_failed", error=str(e))
 
 
 async def single_turn_worker(
@@ -132,33 +154,24 @@ async def single_turn_worker(
     try:
         async with semaphore:  # OUTER: global concurrency cap
             async with session.lock:  # INNER: per-session serialization
+                manager = None
                 try:
-                    manager = None
                     if card_id:
                         # Streaming path: card already created and sent by handler
+                        from lark_oapi.core.token import TokenManager
+                        tenant_token = TokenManager.get_self_tenant_token(api_client._config)
+                        manager = CardStreamingManager(card_id=card_id, tenant_token=tenant_token)
+                        await manager.start()
                         try:
-                            from lark_oapi.core.token import TokenManager
-                            tenant_token = TokenManager.get_self_tenant_token(api_client._config)
-                            manager = CardStreamingManager(card_id=card_id, tenant_token=tenant_token)
-                            await manager.start()
                             result_text = await asyncio.wait_for(
                                 _run_claude_turn_streaming(session.client, prompt, manager),
                                 timeout=timeout,
                             )
-                            await manager.finalize(result_text)
-                        except Exception as stream_exc:
-                            logger.warning("streaming_fallback", error=str(stream_exc))
-                            if manager and not manager._finalized:
-                                try:
-                                    await manager.finalize("")
-                                except Exception:
-                                    pass
-                            # Fallback: collect full response, update card once
-                            result_text = await asyncio.wait_for(
-                                _run_claude_turn(session.client, prompt),
-                                timeout=timeout,
-                            )
-                            await update_card_content(api_client, reply_message_id, result_text)
+                        finally:
+                            # Always finalize — ensures streaming_mode is closed
+                            if not manager._finalized:
+                                await manager.finalize(result_text if 'result_text' in dir() else "")
+                        # Streaming done — no IM patch needed (v2 card updated via PUT element content)
                     else:
                         # Simple path: no card_id, use basic card update
                         result_text = await asyncio.wait_for(
@@ -167,53 +180,14 @@ async def single_turn_worker(
                         )
                         await update_card_content(api_client, reply_message_id, result_text)
                 except asyncio.TimeoutError:
-                    logger.warning(
-                        "claude_worker_timeout",
-                        session_key=session.session_key,
-                        timeout=timeout,
-                    )
-                    try:
-                        await send_error_card(
-                            api_client,
-                            reply_message_id,
-                            f"响应超时（>{timeout:.0f}s），请重试",
-                        )
-                    except Exception as card_exc:
-                        logger.error(
-                            "claude_worker_error_card_failed",
-                            session_key=session.session_key,
-                            error=str(card_exc),
-                        )
+                    logger.warning("claude_worker_timeout", session_key=session.session_key, timeout=timeout)
+                    await _show_error(card_id, manager, api_client, reply_message_id, f"响应超时（>{timeout:.0f}s），请重试")
                 except asyncio.CancelledError:
                     logger.info("claude_worker_cancelled", session_key=session.session_key)
-                    if manager is not None:
-                        try:
-                            await manager.finalize("")
-                        except Exception:
-                            pass
-                    try:
-                        await update_card_content(api_client, reply_message_id, "**已停止** - 用户取消了请求")
-                    except Exception:
-                        pass
-                    raise  # Re-raise so asyncio marks the task as cancelled
+                    await _show_error(card_id, manager, api_client, reply_message_id, "**已停止** - 用户取消了请求")
+                    raise
                 except Exception as exc:
-                    logger.error(
-                        "claude_worker_error",
-                        session_key=session.session_key,
-                        error=str(exc),
-                        error_type=type(exc).__name__,
-                    )
-                    try:
-                        await send_error_card(
-                            api_client,
-                            reply_message_id,
-                            f"处理出错：{exc}",
-                        )
-                    except Exception as card_exc:
-                        logger.error(
-                            "claude_worker_error_card_failed",
-                            session_key=session.session_key,
-                            error=str(card_exc),
-                        )
+                    logger.error("claude_worker_error", session_key=session.session_key, error=str(exc), error_type=type(exc).__name__)
+                    await _show_error(card_id, manager, api_client, reply_message_id, f"处理出错：{exc}")
     finally:
         _active_tasks.pop(reply_message_id, None)

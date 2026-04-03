@@ -46,6 +46,7 @@ class CardStreamingManager:
         self._tool_blocks: list[str] = []
         self._full_text: str = ""
         self._sequence: int = 0
+        self._dirty: bool = False
         self._client = httpx.AsyncClient(timeout=10.0)
         self._flush_task: asyncio.Task | None = None
         self._finalized = False
@@ -67,19 +68,23 @@ class CardStreamingManager:
         self._buffer.append(text)
 
     async def append_tool_use(self, tool_name: str, tool_input: dict[str, Any]) -> None:
-        """Append tool use block."""
+        """Append tool use as compact one-liner."""
         if self._finalized:
             return
-        input_summary = json.dumps(tool_input, ensure_ascii=False)[:100]
-        self._tool_blocks.append(f"🔧 **{tool_name}**\n```\n{input_summary}\n```")
+        # Compact: just tool name, no verbose input
+        self._tool_blocks.append(f"🔧 `{tool_name}`")
+        self._dirty = True
 
     async def append_tool_result(self, content: str | None, is_error: bool = False) -> None:
-        """Append tool result block."""
+        """Update last tool block with result status (compact)."""
         if self._finalized:
             return
-        status = "❌ Error" if is_error else "✅ Done"
-        summary = (content or "")[:200] if content else "(no output)"
-        self._tool_blocks.append(f"{status}\n```\n{summary}\n```")
+        if self._tool_blocks:
+            # Replace last tool entry with result status on same line
+            last = self._tool_blocks[-1]
+            status = "❌" if is_error else "✅"
+            self._tool_blocks[-1] = f"{last} {status}"
+        self._dirty = True
 
     async def finalize(self, final_text: str) -> None:
         """Send final content update (no typing indicator)."""
@@ -93,10 +98,16 @@ class CardStreamingManager:
             except asyncio.CancelledError:
                 pass
 
-        # Build final content
-        if final_text:
-            content = self._build_display_text(final_text, include_typing=False)
+        # Build final content — flush remaining buffer first
+        self._full_text += "".join(self._buffer)
+        self._buffer.clear()
+        final = final_text or self._full_text
+        if final:
+            content = self._build_display_text(final, include_typing=False)
             await self._put_content(content)
+
+        # Wait for client to render final text before closing streaming mode
+        await asyncio.sleep(1.0)
 
         # Close streaming mode so card can be forwarded/interacted with
         await self._close_streaming_mode()
@@ -104,10 +115,11 @@ class CardStreamingManager:
         await self._client.aclose()
 
     def _build_display_text(self, text: str, include_typing: bool = True) -> str:
-        """Build display content: tool blocks + text + optional typing indicator."""
+        """Build display content: compact tool line + text + optional typing indicator."""
         parts = []
         if self._tool_blocks:
-            parts.extend(self._tool_blocks)
+            # All tools on one line, separated by spaces
+            parts.append(" ".join(self._tool_blocks))
         if text:
             parts.append(text)
         if include_typing:
@@ -119,9 +131,10 @@ class CardStreamingManager:
         try:
             while True:
                 await asyncio.sleep(self.flush_interval)
-                if self._buffer:
+                if self._buffer or self._dirty:
                     self._full_text += "".join(self._buffer)
                     self._buffer.clear()
+                    self._dirty = False
                     content = self._build_display_text(self._full_text, include_typing=True)
                     await self._put_content(content)
         except asyncio.CancelledError:
