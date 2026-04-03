@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-04-03T06:07:30.800Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-04-03T06:20:35.322Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 25
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** 飞书消息到 Claude Code 的可靠桥接 — 消息进来，AI 回复出去，流式显示思考过程，不丢消息不崩溃。
-**Current focus:** Phase 01 — feishu-connectivity
+**Current focus:** Phase 03 — streaming-card-renderer
 
 ## Current Position
 
-Phase: 02
-Plan: Not started
-Status: Executing Phase 01
+Phase: 03 (streaming-card-renderer) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-03
 
 Progress: [██░░░░░░░░] 25%
@@ -60,6 +60,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 03 P02 | 8 | 2 tasks | 5 files |
 | Phase 04-stability-and-operations P01 | 2 | 2 tasks | 5 files |
 | Phase 04-stability-and-operations P03 | 2 | 3 tasks | 2 files |
+| Phase 03-streaming-card-renderer P01 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - [Phase 04-stability-and-operations]: bind_contextvars called before asyncio.create_task so worker task inherits event_id context snapshot
 - [Phase 04-stability-and-operations]: _graceful_shutdown uses asyncio.wait(timeout=10) — handles all tasks up to timeout, workers finalize cards before exit
 - [Phase 04-stability-and-operations]: Signal handler is plain callable, not coroutine — loop.create_task() schedules async cleanup per asyncio API requirement
+- [Phase 03-streaming-card-renderer]: CardStreamingManager takes tenant_token directly; token extracted by caller using TokenManager.get_self_tenant_token
+- [Phase 03-streaming-card-renderer]: CardKit v2 format {data: {schema: '2.0', header, body}} applied to all card functions — pre-existing flat format {header, elements} was wrong
 
 ### Pending Todos
 
@@ -101,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T15:41:24.718Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-04-03T06:20:35.319Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None

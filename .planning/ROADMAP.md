@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Feishu Connectivity** - WebSocket long connection, event pipeline, asyncio queue bridge, dedup, @mention filter, "thinking" card
 - [x] **Phase 2: Claude Integration** - Claude Agent SDK, per-conversation asyncio Tasks, session isolation, multi-turn context, watchdog, concurrency control, group chat user attribution (completed 2026-04-01)
-- [ ] **Phase 3: Streaming Card Renderer** - CardKit POST/PATCH lifecycle, 300-500ms batched flush, tool use visibility, typing indicator
+- [x] **Phase 3: Streaming Card Renderer** - CardKit POST/PATCH lifecycle, 300-500ms batched flush, tool use visibility, typing indicator (completed 2026-04-03)
 - [x] **Phase 4: Stability and Operations** - systemd service, graceful shutdown, structured logging, idle TTL cleanup, user commands, interaction buttons (completed 2026-04-01)
 
 ## Phase Details
@@ -67,10 +67,10 @@ Plans:
   3. The card displays a typing indicator during generation and removes it once the response is complete
   4. Sending a rapid sequence of messages does not produce HTTP 429 errors; batching absorbs the burst
   5. The final card contains the complete formatted Markdown response and no typing indicator
-**Plans:** 0/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 03-01-PLAN.md — CardStreamingManager module + cards.py streaming card functions
+- [x] 03-01-PLAN.md — CardStreamingManager module + cards.py streaming card functions
 - [x] 03-02-PLAN.md — Claude worker streaming refactor + card callback infrastructure
 **UI hint**: yes
 
@@ -100,5 +100,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Feishu Connectivity | 2/3 | In Progress|  |
 | 2. Claude Integration | 3/3 | Complete   | 2026-04-01 |
-| 3. Streaming Card Renderer | 0/2 | Planned    |  |
+| 3. Streaming Card Renderer | 2/2 | Complete   | 2026-04-03 |
 | 4. Stability and Operations | 3/3 | Complete   | 2026-04-01 |
