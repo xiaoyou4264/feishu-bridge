@@ -7,6 +7,8 @@ Provides:
 """
 import asyncio
 import json
+import os
+import signal
 import time
 
 import lark_oapi as lark
@@ -330,18 +332,16 @@ async def handle_message(
                 logger.info("model_command", event_id=event_id)
                 return
 
-            # Step 6d: /restart command — destroy all sessions, reconnect fresh
+            # Step 6d: /restart command — restart service and reload config
             if text.strip().lower() == "/restart":
-                session_keys = list(session_manager._sessions.keys())
-                for key in session_keys:
-                    await session_manager.destroy(key)
+                session_count = len(session_manager._sessions)
                 card = {
                     "header": {
-                        "title": {"tag": "plain_text", "content": "小爱已重启"},
-                        "template": "green",
+                        "title": {"tag": "plain_text", "content": "小爱正在重启..."},
+                        "template": "orange",
                     },
                     "elements": [
-                        {"tag": "markdown", "content": f"已断开 **{len(session_keys)}** 个会话的 Claude 连接并重新初始化。\n\n下次发消息时会自动建立新连接。"}
+                        {"tag": "markdown", "content": f"正在重启服务并重新加载配置...\n\n将断开 **{session_count}** 个活跃会话，约 3 秒后恢复服务。"}
                     ],
                 }
                 request = (
@@ -356,7 +356,12 @@ async def handle_message(
                     .build()
                 )
                 await api_client.im.v1.message.areply(request)
-                logger.info("restart_command", event_id=event_id, sessions_destroyed=len(session_keys))
+                logger.info("restart_command", event_id=event_id, sessions=session_count)
+
+                # Give the card reply time to be delivered, then trigger graceful shutdown.
+                # systemd Restart=always will re-launch the process, reloading .env config.
+                await asyncio.sleep(0.5)
+                os.kill(os.getpid(), signal.SIGTERM)
                 return
 
             # Step 7: Send streaming CardKit card as reply (CARD-01 + CARD-02)

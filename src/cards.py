@@ -28,7 +28,7 @@ def build_help_card() -> str:
                     "- `/new` — 重置会话，开始新对话\n"
                     "- `/status` — 查看运行状态\n"
                     "- `/model` — 查看当前模型配置\n"
-                    "- `/restart` — 重启所有 Claude 连接\n"
+                    "- `/restart` — 重启服务并重新加载配置\n"
                     "- `/help` — 显示此帮助信息\n"
                 ),
             }
@@ -358,12 +358,15 @@ async def create_streaming_card(client: lark.Client, stop_message_id: str | None
     Raises:
         RuntimeError: If card creation fails.
     """
-    from src.card_streaming import STREAMING_ELEMENT_ID
+    from src.card_streaming import STREAMING_ELEMENT_ID, TIMER_ELEMENT_ID
 
     # NOTE: CardKit v2 schema does NOT support "action" tag (buttons).
     # Stop button cannot be in the streaming card. It would need a separate mechanism.
+    # Two separate elements: main content (typing animation) + timer (independent 1s updates)
     elements: list[dict] = [
-        {"tag": "markdown", "content": "**正在思考中...**", "element_id": STREAMING_ELEMENT_ID}
+        {"tag": "markdown", "content": "**正在思考中...**", "element_id": STREAMING_ELEMENT_ID},
+        {"tag": "hr"},
+        {"tag": "markdown", "content": "`🧠 思考中 · 0s`", "element_id": TIMER_ELEMENT_ID},
     ]
 
     card_template = {
