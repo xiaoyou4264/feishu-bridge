@@ -106,7 +106,7 @@ None yet.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260407-p25 | 飞书流式卡片改用增量append替代全量刷新，计时器改为动态更新 | 2026-04-07 | pending | [260407-p25-append](./quick/260407-p25-append/) |
+| 260407-p25 | 飞书流式卡片改用增量append替代全量刷新，计时器改为动态更新 | 2026-04-07 | 1c2bfaa | [260407-p25-append](./quick/260407-p25-append/) |
 
 ## Session Continuity
 
