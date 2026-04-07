@@ -8,7 +8,6 @@ Provides:
 import asyncio
 import json
 import os
-import signal
 import time
 
 import lark_oapi as lark
@@ -334,6 +333,33 @@ async def handle_message(
 
             # Step 6d: /restart command — restart service and reload config
             if text.strip().lower() == "/restart":
+                # Auth check: only admin users can restart (empty list = everyone allowed)
+                sender_open_id = data.event.sender.sender_id.open_id
+                if config.admin_users and sender_open_id not in config.admin_users:
+                    deny_card = {
+                        "header": {
+                            "title": {"tag": "plain_text", "content": "权限不足"},
+                            "template": "red",
+                        },
+                        "elements": [
+                            {"tag": "markdown", "content": "⛔ 只有管理员可以执行 /restart 命令。"}
+                        ],
+                    }
+                    deny_req = (
+                        lark.im.v1.ReplyMessageRequest.builder()
+                        .message_id(message.message_id)
+                        .request_body(
+                            lark.im.v1.ReplyMessageRequestBody.builder()
+                            .msg_type("interactive")
+                            .content(json.dumps(deny_card, ensure_ascii=False))
+                            .build()
+                        )
+                        .build()
+                    )
+                    await api_client.im.v1.message.areply(deny_req)
+                    logger.warning("restart_denied", event_id=event_id, sender=sender_open_id)
+                    return
+
                 session_count = len(session_manager._sessions)
                 card = {
                     "header": {
@@ -355,8 +381,27 @@ async def handle_message(
                     )
                     .build()
                 )
-                await api_client.im.v1.message.areply(request)
+                try:
+                    await api_client.im.v1.message.areply(request)
+                except Exception as reply_err:
+                    # Card delivery failed, but still proceed with restart —
+                    # the user won't see the orange card, but the service will restart.
+                    logger.warning("restart_card_failed", error=str(reply_err), event_id=event_id)
                 logger.info("restart_command", event_id=event_id, sessions=session_count)
+
+                # Write restart breadcrumb so the new process can notify the user
+                # on successful startup. Uses /tmp to survive os._exit().
+                # Stores both chat_id and sender open_id — P2P chats may lack chat_id,
+                # so the notification sender falls back to open_id (Issue 2).
+                import tempfile
+                breadcrumb = {
+                    "chat_id": getattr(message, "chat_id", ""),
+                    "sender_open_id": sender_open_id,
+                    "timestamp": time.time(),
+                }
+                breadcrumb_path = os.path.join(tempfile.gettempdir(), "feishu_bridge_restart.json")
+                with open(breadcrumb_path, "w") as f:
+                    json.dump(breadcrumb, f)
 
                 # Give the card reply time to be delivered, then force-exit.
                 # SIGTERM alone doesn't reliably kill the process because lark ws.Client.start()

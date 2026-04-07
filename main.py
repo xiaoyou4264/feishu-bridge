@@ -11,8 +11,10 @@ Starts the Feishu WebSocket long connection bot. On startup:
 """
 import asyncio
 import logging
+import os
 import signal
 import sys
+import time
 
 # CRITICAL (Pitfall 2): Import lark_oapi.ws FIRST before creating any event loop.
 # lark_oapi/ws/client.py captures asyncio.get_event_loop() at module import time.
@@ -111,6 +113,89 @@ async def _graceful_shutdown(loop: asyncio.AbstractEventLoop) -> None:
     loop.stop()
 
 
+def _send_restart_notification(
+    loop: asyncio.AbstractEventLoop,
+    api_client: lark.Client,
+    logger,
+) -> None:
+    """Check for restart breadcrumb and schedule a success notification.
+
+    The /restart command writes a JSON breadcrumb to /tmp with the chat_id
+    and sender_open_id of the user who triggered the restart. If the file
+    exists and is fresh (< 60s old), we schedule an async task to send a
+    green card after a short delay (3s) to give the WS connection time to
+    establish. Uses chat_id for group chats, falls back to open_id for P2P.
+    """
+    import json as _json
+    import tempfile
+
+    breadcrumb_path = os.path.join(tempfile.gettempdir(), "feishu_bridge_restart.json")
+    if not os.path.exists(breadcrumb_path):
+        return
+
+    try:
+        with open(breadcrumb_path) as f:
+            breadcrumb = _json.load(f)
+        os.remove(breadcrumb_path)
+    except (OSError, _json.JSONDecodeError) as exc:
+        logger.warning("restart_breadcrumb_read_failed", error=str(exc))
+        return
+
+    # Ignore stale breadcrumbs (> 60s old — probably a leftover from a crashed restart)
+    elapsed = time.time() - breadcrumb.get("timestamp", 0)
+    if elapsed > 60:
+        logger.info("restart_breadcrumb_stale", elapsed=elapsed)
+        return
+
+    chat_id = breadcrumb.get("chat_id")
+    sender_open_id = breadcrumb.get("sender_open_id")
+    if not chat_id and not sender_open_id:
+        return
+
+    # Prefer chat_id (works for group chats); fall back to sender open_id for P2P
+    receive_id = chat_id or sender_open_id
+    receive_id_type = "chat_id" if chat_id else "open_id"
+
+    async def _notify():
+        await asyncio.sleep(3)  # Wait for WS connection to establish
+        startup_ms = int(elapsed * 1000) + 3000  # rough total from exit to notification
+        card = {
+            "header": {
+                "title": {"tag": "plain_text", "content": "小爱重启完成"},
+                "template": "green",
+            },
+            "elements": [
+                {
+                    "tag": "markdown",
+                    "content": f"✅ 服务已成功重启，配置已重新加载。\n\n启动耗时约 **{startup_ms / 1000:.1f}s**",
+                }
+            ],
+        }
+        request = (
+            lark.im.v1.CreateMessageRequest.builder()
+            .receive_id_type(receive_id_type)
+            .request_body(
+                lark.im.v1.CreateMessageRequestBody.builder()
+                .receive_id(receive_id)
+                .msg_type("interactive")
+                .content(_json.dumps(card, ensure_ascii=False))
+                .build()
+            )
+            .build()
+        )
+        try:
+            resp = await api_client.im.v1.message.acreate(request)
+            if resp.success():
+                logger.info("restart_notification_sent", receive_id=receive_id, type=receive_id_type)
+            else:
+                logger.warning("restart_notification_failed", code=resp.code, msg=resp.msg)
+        except Exception as exc:
+            logger.warning("restart_notification_error", error=str(exc))
+
+    loop.create_task(_notify())
+    logger.info("restart_notification_scheduled", receive_id=receive_id, type=receive_id_type, elapsed=f"{elapsed:.1f}s")
+
+
 def main() -> None:
     """Main entry point — validates config, starts WS client."""
     # 1. Load config (CONN-05) — exits if required vars missing
@@ -201,7 +286,12 @@ def main() -> None:
         auto_reconnect=True,  # CONN-04
     )
 
-    # 10. Start — blocks until process exit (CONN-01)
+    # 10. Send restart-success notification if this process was triggered by /restart.
+    #     The /restart handler writes a breadcrumb file with the chat_id of the requester.
+    #     We schedule the notification 3s after start to allow WS to connect first.
+    _send_restart_notification(loop, api_client, logger)
+
+    # 11. Start — blocks until process exit (CONN-01)
     logger.info("starting", app_id=config.app_id, bot_open_id=bot_open_id)
     ws_client.start()
 

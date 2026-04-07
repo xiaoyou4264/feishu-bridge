@@ -214,8 +214,10 @@ async def single_turn_worker(
             async with session.lock:  # INNER: per-session serialization
                 try:
                     if card_id and manager:
-                        # Streaming path: manager already running, mark stream start
-                        manager.mark_stream_start()
+                        # Streaming path: manager already running
+                        # NOTE: mark_stream_start() is called lazily on first text token
+                        # (via append_text), NOT here — so think time reflects actual
+                        # Claude processing time, not just lock-acquisition time.
                         try:
                             result_text = await asyncio.wait_for(
                                 _run_claude_turn_streaming(session.client, prompt, manager),

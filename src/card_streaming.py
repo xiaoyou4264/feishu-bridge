@@ -84,6 +84,9 @@ class CardStreamingManager:
         """Append text token to buffer (flushed on timer)."""
         if self._finalized:
             return
+        # First text token marks transition from thinking to streaming
+        if self._stream_start is None:
+            self.mark_stream_start()
         self._buffer.append(text)
         self._dirty = True
 
