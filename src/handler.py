@@ -358,11 +358,12 @@ async def handle_message(
                 await api_client.im.v1.message.areply(request)
                 logger.info("restart_command", event_id=event_id, sessions=session_count)
 
-                # Give the card reply time to be delivered, then trigger graceful shutdown.
-                # systemd Restart=always will re-launch the process, reloading .env config.
+                # Give the card reply time to be delivered, then force-exit.
+                # SIGTERM alone doesn't reliably kill the process because lark ws.Client.start()
+                # is a blocking call that may swallow the loop.stop() from graceful shutdown.
+                # os._exit(0) bypasses all cleanup but guarantees systemd Restart=always fires.
                 await asyncio.sleep(0.5)
-                os.kill(os.getpid(), signal.SIGTERM)
-                return
+                os._exit(0)
 
             # Step 7: Send streaming CardKit card as reply (CARD-01 + CARD-02)
             card_id = None

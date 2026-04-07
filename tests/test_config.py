@@ -87,7 +87,7 @@ class TestConfigClaudeFields:
         from src.config import Config
         with patch("src.config.load_dotenv"):
             cfg = Config.from_env()
-        assert cfg.claude_timeout == 120.0
+        assert cfg.claude_timeout == 600.0
 
     def test_config_claude_timeout_from_env(self, monkeypatch):
         """CLAUDE_TIMEOUT=60 produces claude_timeout=60.0."""

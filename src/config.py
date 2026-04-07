@@ -13,7 +13,7 @@ class Config(pydantic.BaseModel):
     app_secret: str
     log_level: str = "INFO"
     working_dir: str = "."
-    claude_timeout: float = 120.0
+    claude_timeout: float = 600.0
     max_concurrent_tasks: int = 5
     allowed_tools: list[str] = []
     session_ttl: float = 3600.0
@@ -29,7 +29,7 @@ class Config(pydantic.BaseModel):
           - APP_SECRET (required)
           - LOG_LEVEL (optional, default "INFO")
           - WORKING_DIR (optional, default ".")
-          - CLAUDE_TIMEOUT (optional, default 120.0)
+          - CLAUDE_TIMEOUT (optional, default 600.0)
           - MAX_CONCURRENT_TASKS (optional, default 5)
           - ALLOWED_TOOLS (optional, default [] — comma-separated list)
           - SESSION_TTL (optional, default 3600.0 — idle session expiry in seconds)
@@ -55,7 +55,7 @@ class Config(pydantic.BaseModel):
                 app_secret=app_secret,
                 log_level=os.environ.get("LOG_LEVEL", "INFO"),
                 working_dir=os.environ.get("WORKING_DIR", "."),
-                claude_timeout=float(os.environ.get("CLAUDE_TIMEOUT", "120")),
+                claude_timeout=float(os.environ.get("CLAUDE_TIMEOUT", "600")),
                 max_concurrent_tasks=int(os.environ.get("MAX_CONCURRENT_TASKS", "5")),
                 allowed_tools=allowed_tools,
                 session_ttl=float(os.environ.get("SESSION_TTL", "3600")),
