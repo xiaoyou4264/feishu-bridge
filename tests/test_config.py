@@ -79,7 +79,7 @@ class TestConfigClaudeFields:
     """Tests for the new Claude-specific config fields."""
 
     def test_config_claude_timeout_default(self, monkeypatch):
-        """Config.from_env() with no CLAUDE_TIMEOUT env var produces claude_timeout=120.0."""
+        """Config.from_env() with no CLAUDE_TIMEOUT env var produces claude_timeout=3600.0."""
         monkeypatch.setenv("APP_ID", "test_id")
         monkeypatch.setenv("APP_SECRET", "test_secret")
         monkeypatch.delenv("CLAUDE_TIMEOUT", raising=False)
@@ -87,7 +87,7 @@ class TestConfigClaudeFields:
         from src.config import Config
         with patch("src.config.load_dotenv"):
             cfg = Config.from_env()
-        assert cfg.claude_timeout == 600.0
+        assert cfg.claude_timeout == 3600.0
 
     def test_config_claude_timeout_from_env(self, monkeypatch):
         """CLAUDE_TIMEOUT=60 produces claude_timeout=60.0."""
