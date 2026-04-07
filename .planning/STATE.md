@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 Phase: 03 (streaming-card-renderer) — EXECUTING
 Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-03
+Last activity: 2026-04-07 - Completed quick task 260407-p25: 流式卡片双元素架构
 
 Progress: [██░░░░░░░░] 25%
 
@@ -102,8 +102,14 @@ None yet.
 - [Phase 1 note]: Confirm exact thread model of `lark.ws.Client` sync handler (daemon thread -> `loop.call_soon_threadsafe`) via lark-oapi GitHub source before implementation.
 - [Phase 3 flag]: CardKit PATCH `streaming_config` parameters (`print_step`, `print_frequency_ms`, `print_strategy`) need live doc verification at Phase 3 start. Official docs were behind JS rendering during research.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260407-p25 | 飞书流式卡片改用增量append替代全量刷新，计时器改为动态更新 | 2026-04-07 | pending | [260407-p25-append](./quick/260407-p25-append/) |
+
 ## Session Continuity
 
-Last session: 2026-04-03T06:20:35.319Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-04-07
+Stopped at: Completed quick task 260407-p25
 Resume file: None
