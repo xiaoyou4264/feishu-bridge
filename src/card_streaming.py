@@ -194,6 +194,9 @@ class CardStreamingManager:
         Content always prefix-extends → smooth typing animation.
         """
         try:
+            # Immediately PUT initial content to take over from static card template
+            content = self._build_display_text(self._full_text, include_typing=True)
+            await self._put_element(STREAMING_ELEMENT_ID, content)
             last_body = ""
             while True:
                 await asyncio.sleep(self.flush_interval)
